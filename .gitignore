@@ -1,0 +1,30 @@
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.ipynb_checkpoints/
+.venv/
+venv/
+
+# Local big-data storage. Keep data out of git.
+data/*
+!data/.gitkeep
+!data/raw/
+!data/raw/.gitkeep
+!data/bronze/
+!data/bronze/.gitkeep
+!data/silver/
+!data/silver/.gitkeep
+!data/gold/
+!data/gold/.gitkeep
+!data/features/
+!data/features/.gitkeep
+
+# Spark/local runtime outputs
+spark-warehouse/
+metastore_db/
+derby.log
+*.parquet
+*.crc
+
+# Local editor files
+*.code-workspace
