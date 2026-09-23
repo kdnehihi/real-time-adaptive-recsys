@@ -52,10 +52,11 @@ Quick verification:
 python -c "import pyspark; print(pyspark.__version__)"
 ```
 
-Run project modules from the repository root:
+Run project scripts from the repository root:
 
 ```bash
-python -m recommender.data.convert_csv_to_parquet --help
+python scripts/convert_kuairand_to_bronze.py --help
+python scripts/build_kuairand_silver.py --help
 ```
 
 If a notebook Spark cell was already executed before environment or Spark config changes, restart the Jupyter kernel. Spark driver settings are applied only when the JVM starts.
@@ -65,20 +66,20 @@ If a notebook Spark cell was already executed before environment or Spark config
 Put CSV files under `data/raw/kuairand/`, then run:
 
 ```bash
-python -m recommender.data.convert_csv_to_parquet \
+python scripts/convert_kuairand_to_bronze.py \
   --input-dir data/raw/kuairand \
   --output-dir data/bronze/kuairand \
   --overwrite
 ```
 
-The EDA notebook can also convert any local KuaiRand CSV directory to Parquet before analysis.
+The EDA notebook only checks whether bronze Parquet already exists and prints this command if it is missing.
 
 ## Build Silver Tables
 
 After bronze Parquet exists, build cleaned silver tables:
 
 ```bash
-python -m recommender.data.build_silver \
+python scripts/build_kuairand_silver.py \
   --bronze-dir data/bronze/kuairand \
   --silver-dir data/silver/kuairand \
   --overwrite
@@ -87,7 +88,7 @@ python -m recommender.data.build_silver \
 To rebuild only selected tables:
 
 ```bash
-python -m recommender.data.build_silver --tables videos_basic videos_statistics --overwrite
+python scripts/build_kuairand_silver.py --tables videos_basic videos_statistics --overwrite
 ```
 
 Outputs:

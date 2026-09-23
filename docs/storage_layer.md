@@ -13,8 +13,8 @@ This project uses a small lakehouse-style layout that can run locally now and ma
 ## Current Flow
 
 1. Put KuaiRand CSV files under `data/raw/kuairand/` or keep a local raw directory outside git.
-2. Convert CSV to Parquet under `data/bronze/kuairand/`.
-3. Build cleaned silver tables under `data/silver/kuairand/`.
+2. Convert CSV to Parquet under `data/bronze/kuairand/` with `python scripts/convert_kuairand_to_bronze.py --overwrite`.
+3. Build cleaned silver tables under `data/silver/kuairand/` with `python scripts/build_kuairand_silver.py --overwrite`.
 4. Run EDA and downstream preprocessing from Parquet.
 
 ## Silver Tables
