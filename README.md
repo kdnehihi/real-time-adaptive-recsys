@@ -7,11 +7,11 @@ The current scope is data understanding and batch preprocessing. Kafka, streamin
 ## Project Structure
 
 - `notebooks/`: Jupyter notebooks for exploration. Start with `01_kuairand_data_understanding.ipynb`.
-- `src/recsys/data/`: data ingestion and preprocessing utilities, including CSV to Parquet conversion.
-- `src/recsys/features/`: placeholder for offline and future online feature generation.
-- `src/recsys/models/`: placeholder for training, evaluation, and model artifacts.
-- `src/recsys/streaming/`: placeholder for future streaming consumers/processors.
-- `src/recsys/serving/`: placeholder for future recommendation API code.
+- `recsys/data/`: data ingestion and preprocessing utilities, including CSV to Parquet conversion.
+- `recsys/features/`: placeholder for offline and future online feature generation.
+- `recsys/models/`: placeholder for training, evaluation, and model artifacts.
+- `recsys/streaming/`: placeholder for future streaming consumers/processors.
+- `recsys/serving/`: placeholder for future recommendation API code.
 - `configs/`: example local configuration.
 - `docs/`: project notes, including the storage layer design.
 - `data/`: local raw/processed/feature data. This directory is ignored by git except `.gitkeep` placeholders.
@@ -52,10 +52,10 @@ Quick verification:
 python -c "import pyspark; print(pyspark.__version__)"
 ```
 
-When running project modules from the command line, set `PYTHONPATH=src`:
+Run project modules from the repository root:
 
 ```bash
-PYTHONPATH=src python -m recsys.data.convert_csv_to_parquet --help
+python -m recsys.data.convert_csv_to_parquet --help
 ```
 
 If a notebook Spark cell was already executed before environment or Spark config changes, restart the Jupyter kernel. Spark driver settings are applied only when the JVM starts.
@@ -65,7 +65,7 @@ If a notebook Spark cell was already executed before environment or Spark config
 Put CSV files under `data/raw/kuairand/`, then run:
 
 ```bash
-PYTHONPATH=src python -m recsys.data.convert_csv_to_parquet \
+python -m recsys.data.convert_csv_to_parquet \
   --input-dir data/raw/kuairand \
   --output-dir data/bronze/kuairand \
   --overwrite
