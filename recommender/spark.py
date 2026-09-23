@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import os
 import sys
+from pathlib import Path
 
 from py4j.protocol import Py4JError, Py4JNetworkError
 from pyspark import SparkContext
@@ -32,6 +33,10 @@ def get_spark(app_name: str = "recommender", reset: bool = False) -> SparkSessio
     os.environ.setdefault("PYSPARK_SUBMIT_ARGS", "--driver-memory 4g pyspark-shell")
     os.environ["PYSPARK_PYTHON"] = sys.executable
     os.environ["PYSPARK_DRIVER_PYTHON"] = sys.executable
+    spark_local_dir = Path(os.getenv("SPARK_LOCAL_DIR", "data/spark-tmp")).resolve()
+    spark_local_dir.mkdir(parents=True, exist_ok=True)
+    os.environ["SPARK_LOCAL_DIRS"] = str(spark_local_dir)
+    os.environ["LOCAL_DIRS"] = str(spark_local_dir)
 
     if reset:
         _clear_spark_state()
@@ -53,6 +58,7 @@ def get_spark(app_name: str = "recommender", reset: bool = False) -> SparkSessio
         .config("spark.sql.shuffle.partitions", "8")
         .config("spark.driver.bindAddress", "127.0.0.1")
         .config("spark.driver.host", "127.0.0.1")
+        .config("spark.local.dir", str(spark_local_dir))
         .config("spark.sql.execution.arrow.pyspark.enabled", "true")
         .config("spark.pyspark.python", sys.executable)
         .config("spark.pyspark.driver.python", sys.executable)
