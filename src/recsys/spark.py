@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import os
+import sys
 
 from py4j.protocol import Py4JError, Py4JNetworkError
 from pyspark import SparkContext
@@ -29,6 +30,8 @@ def _session_is_healthy(session: SparkSession | None) -> bool:
 def get_spark(app_name: str = "recsys", reset: bool = False) -> SparkSession:
     os.environ.setdefault("SPARK_LOCAL_IP", "127.0.0.1")
     os.environ.setdefault("PYSPARK_SUBMIT_ARGS", "--driver-memory 4g pyspark-shell")
+    os.environ["PYSPARK_PYTHON"] = sys.executable
+    os.environ["PYSPARK_DRIVER_PYTHON"] = sys.executable
 
     if reset:
         _clear_spark_state()
@@ -51,6 +54,8 @@ def get_spark(app_name: str = "recsys", reset: bool = False) -> SparkSession:
         .config("spark.driver.bindAddress", "127.0.0.1")
         .config("spark.driver.host", "127.0.0.1")
         .config("spark.sql.execution.arrow.pyspark.enabled", "true")
+        .config("spark.pyspark.python", sys.executable)
+        .config("spark.pyspark.driver.python", sys.executable)
     )
 
     try:
