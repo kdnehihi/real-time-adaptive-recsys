@@ -6,7 +6,7 @@ The current scope is data understanding and batch preprocessing. Kafka, streamin
 
 ## Project Structure
 
-- `notebooks/`: Jupyter notebooks for exploration. Start with `01_kuairand_data_understanding.ipynb`.
+- `notebooks/`: Jupyter notebooks for exploration and feature analysis. Start with `01_kuairand_data_understanding.ipynb`, then use `02_kuairand_feature_analysis_selection.ipynb` for gold/model feature decisions.
 - `recommender/data/`: data ingestion and preprocessing utilities, including CSV to Parquet conversion.
 - `recommender/features/`: placeholder for offline and future online feature generation.
 - `recommender/models/`: placeholder for training, evaluation, and model artifacts.
