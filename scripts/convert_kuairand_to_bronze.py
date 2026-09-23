@@ -12,10 +12,18 @@ from recommender.data.convert_csv_to_parquet import convert_csv_directory  # noq
 
 
 def parse_args() -> argparse.Namespace:
-    parser = argparse.ArgumentParser(description="Convert local KuaiRand CSV files to bronze Parquet.")
-    parser.add_argument("--input-dir", type=Path, default=PROJECT_ROOT / "data/raw/kuairand")
-    parser.add_argument("--output-dir", type=Path, default=PROJECT_ROOT / "data/bronze/kuairand")
-    parser.add_argument("--overwrite", action="store_true")
+    parser = argparse.ArgumentParser(
+        description="Convert local KuaiRand CSV files to bronze Parquet.",
+        formatter_class=argparse.ArgumentDefaultsHelpFormatter,
+    )
+    parser.add_argument("--input-dir", type=Path, default=PROJECT_ROOT / "data/raw", help="Directory containing raw CSV files.")
+    parser.add_argument(
+        "--output-dir",
+        type=Path,
+        default=PROJECT_ROOT / "data/bronze/kuairand",
+        help="Bronze Parquet output directory.",
+    )
+    parser.add_argument("--overwrite", action="store_true", help="Overwrite existing bronze tables.")
     return parser.parse_args()
 
 

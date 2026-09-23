@@ -63,11 +63,11 @@ If a notebook Spark cell was already executed before environment or Spark config
 
 ## Convert CSV to Parquet
 
-Put CSV files under `data/raw/kuairand/`, then run:
+Put CSV files under `data/raw/`, then run:
 
 ```bash
 python scripts/convert_kuairand_to_bronze.py \
-  --input-dir data/raw/kuairand \
+  --input-dir data/raw \
   --output-dir data/bronze/kuairand \
   --overwrite
 ```
