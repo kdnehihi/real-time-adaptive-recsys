@@ -3,6 +3,7 @@ from __future__ import annotations
 import argparse
 from pathlib import Path
 
+from recsys.data.kuairand import read_csv
 from recsys.spark import get_spark
 
 
@@ -18,7 +19,7 @@ def convert_csv_directory(input_dir: Path, output_dir: Path, overwrite: bool = F
     for csv_file in csv_files:
         table_name = csv_file.stem
         target = output_dir / table_name
-        df = spark.read.option("header", True).option("inferSchema", True).csv(str(csv_file))
+        df = read_csv(spark, csv_file)
         df.write.mode(mode).parquet(str(target))
         print(f"Wrote {csv_file} -> {target}")
 

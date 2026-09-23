@@ -6,7 +6,8 @@ __pycache__/
 venv/
 
 # Local big-data storage. Keep data out of git.
-data/*
+data/**
+!data/
 !data/.gitkeep
 !data/raw/
 !data/raw/.gitkeep

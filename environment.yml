@@ -1,0 +1,9 @@
+name: recsys
+channels:
+  - conda-forge
+dependencies:
+  - python=3.11
+  - openjdk=17
+  - pip=24.2
+  - pip:
+      - -r requirements.txt

@@ -29,11 +29,36 @@ See `docs/storage_layer.md` for more detail.
 
 ## Setup
 
+Recommended local environment: Conda env `recsys` with Python 3.11, Java 17, and PySpark 3.5.6.
+
 ```bash
-python -m venv .venv
-source .venv/bin/activate
+conda create -n recsys -c conda-forge python=3.11 openjdk=17 pip=24.2 -y
+conda activate recsys
 pip install -r requirements.txt
+python -m ipykernel install --user --name recsys --display-name "Python (recsys)"
 ```
+
+Alternative using the checked-in environment file:
+
+```bash
+conda env create -f environment.yml
+conda activate recsys
+python -m ipykernel install --user --name recsys --display-name "Python (recsys)"
+```
+
+Quick verification:
+
+```bash
+python -c "import pyspark; print(pyspark.__version__)"
+```
+
+When running project modules from the command line, set `PYTHONPATH=src`:
+
+```bash
+PYTHONPATH=src python -m recsys.data.convert_csv_to_parquet --help
+```
+
+If a notebook Spark cell was already executed before environment or Spark config changes, restart the Jupyter kernel. Spark driver settings are applied only when the JVM starts.
 
 ## Convert CSV to Parquet
 

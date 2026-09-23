@@ -1,3 +1,19 @@
-pyspark>=3.5,<4.0
-jupyterlab>=4.0
-ipykernel>=6.0
+# Core big-data stack
+pyspark==3.5.6
+py4j==0.10.9.7
+
+# Notebook environment
+jupyterlab==4.2.5
+ipykernel==6.29.5
+ipywidgets==8.1.5
+
+# Small-data interop for sampled Spark outputs and notebook charts
+numpy==1.26.4
+pandas==2.2.2
+pyarrow==15.0.2
+matplotlib==3.8.4
+seaborn==0.13.2
+
+# Config and testing
+python-dotenv==1.0.1
+pytest==8.3.2
