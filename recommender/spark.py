@@ -9,6 +9,10 @@ from pyspark import SparkContext
 from pyspark.sql import SparkSession
 
 
+def _project_root() -> Path:
+    return Path(__file__).resolve().parents[1]
+
+
 def _clear_spark_state() -> None:
     SparkSession._instantiatedSession = None
     SparkSession._activeSession = None
@@ -33,7 +37,7 @@ def get_spark(app_name: str = "recommender", reset: bool = False) -> SparkSessio
     os.environ.setdefault("PYSPARK_SUBMIT_ARGS", "--driver-memory 4g pyspark-shell")
     os.environ["PYSPARK_PYTHON"] = sys.executable
     os.environ["PYSPARK_DRIVER_PYTHON"] = sys.executable
-    spark_local_dir = Path(os.getenv("SPARK_LOCAL_DIR", "data/spark-tmp")).resolve()
+    spark_local_dir = Path(os.getenv("SPARK_LOCAL_DIR", _project_root() / "data/spark-tmp")).resolve()
     spark_local_dir.mkdir(parents=True, exist_ok=True)
     os.environ["SPARK_LOCAL_DIRS"] = str(spark_local_dir)
     os.environ["LOCAL_DIRS"] = str(spark_local_dir)

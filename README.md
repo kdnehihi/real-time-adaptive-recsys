@@ -72,3 +72,27 @@ python -m recommender.data.convert_csv_to_parquet \
 ```
 
 The EDA notebook can also convert any local KuaiRand CSV directory to Parquet before analysis.
+
+## Build Silver Tables
+
+After bronze Parquet exists, build cleaned silver tables:
+
+```bash
+python -m recommender.data.build_silver \
+  --bronze-dir data/bronze/kuairand \
+  --silver-dir data/silver/kuairand \
+  --overwrite
+```
+
+To rebuild only selected tables:
+
+```bash
+python -m recommender.data.build_silver --tables videos_basic videos_statistics --overwrite
+```
+
+Outputs:
+
+- `data/silver/kuairand/interactions/`: typed interaction events with event time, watch ratio, and basic labels.
+- `data/silver/kuairand/users/`: user features with one-hot missing indicators and filled one-hot values.
+- `data/silver/kuairand/videos_basic/`: video metadata with upload date, duration seconds, aspect ratio, and missing indicators.
+- `data/silver/kuairand/videos_statistics/`: historical video statistics with all original counters plus basic rate features.
