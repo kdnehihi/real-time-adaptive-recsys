@@ -27,7 +27,7 @@ def _session_is_healthy(session: SparkSession | None) -> bool:
         return False
 
 
-def get_spark(app_name: str = "recsys", reset: bool = False) -> SparkSession:
+def get_spark(app_name: str = "recommender", reset: bool = False) -> SparkSession:
     os.environ.setdefault("SPARK_LOCAL_IP", "127.0.0.1")
     os.environ.setdefault("PYSPARK_SUBMIT_ARGS", "--driver-memory 4g pyspark-shell")
     os.environ["PYSPARK_PYTHON"] = sys.executable

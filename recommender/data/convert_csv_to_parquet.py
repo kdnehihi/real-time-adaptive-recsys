@@ -3,8 +3,8 @@ from __future__ import annotations
 import argparse
 from pathlib import Path
 
-from recsys.data.kuairand import read_csv
-from recsys.spark import get_spark
+from recommender.data.kuairand import read_csv
+from recommender.spark import get_spark
 
 
 def convert_csv_directory(input_dir: Path, output_dir: Path, overwrite: bool = False) -> None:
