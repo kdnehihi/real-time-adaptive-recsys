@@ -26,4 +26,16 @@ This project uses a small lakehouse-style layout that can run locally now and ma
 
 Video metadata and historical statistics stay separate in silver to keep this layer complete but storage-friendly. Task-specific joins and feature selection belong in gold tables.
 
+## ALS Gold Tables
+
+`data/gold/als/v1/` contains the collaborative-filtering baseline artifacts:
+
+- `train_interactions`: train-only `(user_idx, video_idx, interaction_strength)` for implicit ALS.
+- `validation_relevance` and `test_relevance`: future strong-engagement labels for ranking evaluation.
+- `user_mapping` and `item_mapping`: deterministic train-entity ID mappings.
+- `train_validation_interactions`: final Train+Validation interactions used for the final ALS model.
+- `final_user_mapping` and `final_item_mapping`: mappings for the final Train+Validation model.
+- `user_factors` and `item_factors`: Spark ALS latent vectors.
+- `manifest.json`: split cutoffs, formula, metrics, cold-start coverage, selected ALS parameters, and artifact paths.
+
 Raw data and generated datasets are ignored by git. Commit schemas, notebooks, configs, and code only.

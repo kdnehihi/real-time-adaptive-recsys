@@ -97,3 +97,31 @@ Outputs:
 - `data/silver/kuairand/users/`: user features with one-hot missing indicators and filled one-hot values.
 - `data/silver/kuairand/videos_basic/`: video metadata with upload date, duration seconds, aspect ratio, and missing indicators.
 - `data/silver/kuairand/videos_statistics/`: historical video statistics with all original counters plus basic rate features.
+
+## Build ALS Gold and Baselines
+
+Build the collaborative-filtering gold dataset, run popularity and Spark ALS baselines, and save final latent factors:
+
+```bash
+python scripts/run_kuairand_als_baseline.py \
+  --output-dir data/gold/als/v1 \
+  --overwrite
+```
+
+For a quicker local smoke run:
+
+```bash
+python scripts/run_kuairand_als_baseline.py \
+  --output-dir data/gold/als/v1 \
+  --ranks 32 \
+  --reg-params 0.05 \
+  --alphas 10 \
+  --max-iter 5 \
+  --overwrite
+```
+
+Optional interaction-strength weight tuning uses Optuna when installed and falls back to random search:
+
+```bash
+python scripts/run_kuairand_als_baseline.py --strength-tuning-trials 10 --overwrite
+```
