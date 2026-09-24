@@ -100,19 +100,28 @@ Outputs:
 
 ## Build ALS Gold and Baselines
 
-Build the collaborative-filtering gold dataset, run popularity and Spark ALS baselines, and save final latent factors:
+Build the collaborative-filtering gold dataset:
 
 ```bash
-python scripts/run_kuairand_als_baseline.py \
+python scripts/build_kuairand_als_gold.py \
   --output-dir data/gold/als/v1 \
   --overwrite
 ```
 
-For a quicker local smoke run:
+Optional interaction-strength tuning during Gold build:
 
 ```bash
-python scripts/run_kuairand_als_baseline.py \
+python scripts/build_kuairand_als_gold.py \
   --output-dir data/gold/als/v1 \
+  --strength-tuning-trials 10 \
+  --overwrite
+```
+
+Train popularity and Spark ALS baselines with MLflow tracking:
+
+```bash
+python scripts/train_kuairand_als_baseline.py \
+  --gold-dir data/gold/als/v1 \
   --ranks 32 \
   --reg-params 0.05 \
   --alphas 10 \
@@ -120,8 +129,4 @@ python scripts/run_kuairand_als_baseline.py \
   --overwrite
 ```
 
-Optional interaction-strength weight tuning uses Optuna when installed and falls back to random search:
-
-```bash
-python scripts/run_kuairand_als_baseline.py --strength-tuning-trials 10 --overwrite
-```
+MLflow runs are stored under `data/mlruns/` by default.

@@ -28,7 +28,7 @@ Video metadata and historical statistics stay separate in silver to keep this la
 
 ## ALS Gold Tables
 
-`data/gold/als/v1/` contains the collaborative-filtering baseline artifacts:
+`data/gold/als/v1/` contains the collaborative-filtering baseline artifacts. Build it with `python scripts/build_kuairand_als_gold.py --overwrite`, then train/evaluate with `python scripts/train_kuairand_als_baseline.py --overwrite`.
 
 - `train_interactions`: train-only `(user_idx, video_idx, interaction_strength)` for implicit ALS.
 - `validation_relevance` and `test_relevance`: future strong-engagement labels for ranking evaluation.
@@ -37,5 +37,7 @@ Video metadata and historical statistics stay separate in silver to keep this la
 - `final_user_mapping` and `final_item_mapping`: mappings for the final Train+Validation model.
 - `user_factors` and `item_factors`: Spark ALS latent vectors.
 - `manifest.json`: split cutoffs, formula, metrics, cold-start coverage, selected ALS parameters, and artifact paths.
+
+MLflow experiment runs are stored locally in `data/mlruns/` unless another tracking directory is passed.
 
 Raw data and generated datasets are ignored by git. Commit schemas, notebooks, configs, and code only.
