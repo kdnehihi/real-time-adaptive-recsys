@@ -130,3 +130,11 @@ python scripts/train_kuairand_als_baseline.py \
 ```
 
 MLflow runs are stored under `data/mlruns/` by default.
+
+For Colab training, upload `data/silver/kuairand/interactions/` to:
+
+```text
+MyDrive/recsys/data/silver/kuairand/interactions/
+```
+
+Then open `notebooks/04_colab_als_baseline.ipynb`.
