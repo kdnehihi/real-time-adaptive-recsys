@@ -344,21 +344,21 @@ def add_cold_start_flags(examples: DataFrame) -> DataFrame:
 
 
 def cold_start_stats(examples: DataFrame) -> dict[str, dict]:
-    stats = {}
-    for split in ["train", "validation", "test"]:
-        df = examples.where(F.col("split") == split)
-        total = df.count()
-        if total == 0:
-            stats[split] = {"examples": 0}
-            continue
-        row = df.agg(
+    rows = (
+        examples.groupBy("split")
+        .agg(
+            F.count("*").alias("examples"),
             F.avg(F.col("is_warm_user").cast("double")).alias("warm_user_rate"),
             F.avg(F.col("is_warm_item").cast("double")).alias("warm_item_rate"),
             F.avg(F.col("has_user_history").cast("double")).alias("has_user_history_rate"),
             F.avg(F.col("has_item_metadata").cast("double")).alias("has_item_metadata_rate"),
-        ).first()
-        stats[split] = {
-            "examples": int(total),
+        )
+        .collect()
+    )
+    stats = {split: {"examples": 0} for split in ["train", "validation", "test"]}
+    for row in rows:
+        stats[row["split"]] = {
+            "examples": int(row["examples"] or 0),
             "warm_user_rate": float(row["warm_user_rate"] or 0.0),
             "warm_item_rate": float(row["warm_item_rate"] or 0.0),
             "cold_user_rate": float(1.0 - (row["warm_user_rate"] or 0.0)),
@@ -380,36 +380,50 @@ def build_vocabulary(df: DataFrame, column: str) -> DataFrame:
 
 
 def vocabulary_stats(train_examples: DataFrame, categorical_cols: list[str]) -> dict:
-    stats = {}
-    for col in categorical_cols:
-        if col in train_examples.columns:
-            stats[col] = {"fit_split": "train", "cardinality_excluding_oov": train_examples.select(col).distinct().count()}
-    return stats
+    existing = [c for c in categorical_cols if c in train_examples.columns]
+    if not existing:
+        return {}
+
+    row = train_examples.agg(*[F.countDistinct(F.col(c)).alias(c) for c in existing]).first()
+    return {
+        col: {"fit_split": "train", "cardinality_excluding_oov": int(row[col] or 0)}
+        for col in existing
+    }
 
 
 def numerical_transform_stats(train_examples: DataFrame, numeric_cols: list[str]) -> dict:
     existing = [c for c in numeric_cols if c in train_examples.columns]
+    if not existing:
+        return {}
+
+    agg_exprs = []
+    for col in existing:
+        value = F.col(col).cast("double")
+        agg_exprs.extend(
+            [
+                F.count(value).alias(f"{col}__non_null"),
+                F.mean(value).alias(f"{col}__mean"),
+                F.stddev(value).alias(f"{col}__stddev"),
+                F.min(value).alias(f"{col}__min"),
+                F.percentile_approx(value, [0.01, 0.5, 0.99], 1000).alias(f"{col}__quantiles"),
+                F.max(value).alias(f"{col}__max"),
+            ]
+        )
+
+    row = train_examples.agg(*agg_exprs).first()
     stats = {}
     for col in existing:
-        row = train_examples.select(F.col(col).cast("double").alias(col)).agg(
-            F.count(F.col(col)).alias("non_null"),
-            F.mean(col).alias("mean"),
-            F.stddev(col).alias("stddev"),
-            F.min(col).alias("min"),
-            F.expr(f"percentile_approx({col}, array(0.01, 0.5, 0.99), 1000)").alias("quantiles"),
-            F.max(col).alias("max"),
-        ).first()
-        qs = row["quantiles"] or [None, None, None]
+        qs = row[f"{col}__quantiles"] or [None, None, None]
         stats[col] = {
             "fit_split": "train",
-            "non_null": int(row["non_null"] or 0),
-            "mean": float(row["mean"]) if row["mean"] is not None else None,
-            "stddev": float(row["stddev"]) if row["stddev"] is not None else None,
-            "min": float(row["min"]) if row["min"] is not None else None,
+            "non_null": int(row[f"{col}__non_null"] or 0),
+            "mean": float(row[f"{col}__mean"]) if row[f"{col}__mean"] is not None else None,
+            "stddev": float(row[f"{col}__stddev"]) if row[f"{col}__stddev"] is not None else None,
+            "min": float(row[f"{col}__min"]) if row[f"{col}__min"] is not None else None,
             "p01": float(qs[0]) if qs[0] is not None else None,
             "median": float(qs[1]) if qs[1] is not None else None,
             "p99": float(qs[2]) if qs[2] is not None else None,
-            "max": float(row["max"]) if row["max"] is not None else None,
+            "max": float(row[f"{col}__max"]) if row[f"{col}__max"] is not None else None,
         }
     return stats
 
@@ -460,22 +474,32 @@ def build_feature_catalog(total_rows: int | None = None) -> list[dict]:
 
 def quality_checks(examples: DataFrame) -> dict:
     duplicate_examples = examples.groupBy("example_id").count().where(F.col("count") > 1).count()
-    bad_history = examples.where(
-        (F.col("history_end_user_event_index") >= F.col("user_event_index"))
-        | (F.col("history_end_session_event_index") >= F.col("session_event_index"))
-    ).count()
-    bad_user_history_count = examples.where(F.col("user_hist_events") != F.col("history_end_user_event_index")).count()
-    current_item_in_first_history = examples.where((F.col("history_end_user_event_index") == 0) & (F.col("user_hist_events") != 0)).count()
-    bad_split = examples.where(
-        ((F.col("split") == "train") & (F.col("time_ms") >= F.lit(0)) & F.col("time_ms").isNull())
-    ).count()
+    row = examples.agg(
+        F.sum(
+            (
+                (F.col("history_end_user_event_index") >= F.col("user_event_index"))
+                | (F.col("history_end_session_event_index") >= F.col("session_event_index"))
+            ).cast("long")
+        ).alias("bad_history"),
+        F.sum((F.col("user_hist_events") != F.col("history_end_user_event_index")).cast("long")).alias(
+            "bad_user_history_count"
+        ),
+        F.sum(
+            ((F.col("history_end_user_event_index") == 0) & (F.col("user_hist_events") != 0)).cast("long")
+        ).alias("current_item_in_first_history"),
+        F.sum(F.col("time_ms").isNull().cast("long")).alias("null_time_rows"),
+    ).first()
+    bad_history = int(row["bad_history"] or 0)
+    bad_user_history_count = int(row["bad_user_history_count"] or 0)
+    current_item_in_first_history = int(row["current_item_in_first_history"] or 0)
+    null_time_rows = int(row["null_time_rows"] or 0)
     return {
         "duplicate_example_ids": int(duplicate_examples),
-        "bad_history_index_rows": int(bad_history),
-        "bad_user_history_count_rows": int(bad_user_history_count),
-        "first_history_contains_rows": int(current_item_in_first_history),
-        "null_time_rows": int(bad_split),
-        "passed": duplicate_examples == 0 and bad_history == 0 and bad_user_history_count == 0 and current_item_in_first_history == 0 and bad_split == 0,
+        "bad_history_index_rows": bad_history,
+        "bad_user_history_count_rows": bad_user_history_count,
+        "first_history_contains_rows": current_item_in_first_history,
+        "null_time_rows": null_time_rows,
+        "passed": duplicate_examples == 0 and bad_history == 0 and bad_user_history_count == 0 and current_item_in_first_history == 0 and null_time_rows == 0,
     }
 
 
