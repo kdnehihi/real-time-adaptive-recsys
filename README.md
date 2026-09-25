@@ -26,6 +26,7 @@ The current scope is data understanding and batch preprocessing. Kafka, streamin
 - `data/features/`: feature tables for model training and future online sync.
 
 See `docs/storage_layer.md` for more detail.
+See `docs/gold_data_design.md` for the current ALS baseline and Two-Tower Gold dataset contracts.
 
 ## Setup
 
