@@ -3,6 +3,7 @@ from __future__ import annotations
 import argparse
 import json
 import os
+import time
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Iterable
@@ -516,12 +517,40 @@ def quality_checks(examples: DataFrame) -> dict:
     }
 
 
+def log_step(message: str) -> float:
+    now = datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M:%S UTC")
+    print(f"[{now}] {message}", flush=True)
+    return time.monotonic()
+
+
+def log_done(message: str, start: float) -> None:
+    elapsed = time.monotonic() - start
+    log_step(f"{message} done in {elapsed / 60:.1f} min")
+
+
+def write_parquet_logged(df: DataFrame, path: Path, overwrite: bool, label: str) -> None:
+    start = log_step(f"START write {label}: {path}")
+    write_parquet(df, path, overwrite)
+    log_done(f"WRITE {label}", start)
+
+
 def write_gold_dataset(args: argparse.Namespace) -> dict:
+    pipeline_start = log_step("START two-tower Gold build")
     spark = get_spark("kuairand-build-two-tower-gold", reset=True)
     args.output_dir.mkdir(parents=True, exist_ok=True)
+    log_step(
+        "Spark ready "
+        f"version={spark.version} master={spark.sparkContext.master} "
+        f"shuffle_partitions={spark.conf.get('spark.sql.shuffle.partitions')} "
+        f"storage_level={os.getenv('TWO_TOWER_STORAGE_LEVEL', 'DISK_ONLY')}"
+    )
+
+    start = log_step(f"START read Silver tables from {args.silver_dir}")
     tables = read_silver_tables(spark, args.silver_dir)
     validate_silver_schema(tables)
+    log_done("Read and validate Silver tables", start)
 
+    start = log_step("START build chronological examples and point-in-time features")
     examples, split_meta = build_examples(
         tables["interactions"],
         tables["users"],
@@ -530,8 +559,10 @@ def write_gold_dataset(args: argparse.Namespace) -> dict:
         args.validation_quantile,
         args.weak_watch_ratio_threshold,
     )
+    log_step(f"Temporal split metadata: {json.dumps(split_meta, sort_keys=True)}")
     storage_level = storage_level_from_env()
     examples = add_cold_start_flags(examples).persist(storage_level)
+    log_done("Build lazy example plan", start)
 
     categorical_cols = [c for c in USER_STATIC_CATEGORICAL + ITEM_STATIC_CATEGORICAL if c in examples.columns]
     numeric_cols = [
@@ -546,12 +577,22 @@ def write_gold_dataset(args: argparse.Namespace) -> dict:
     ]
     train_examples = examples.where(F.col("split") == "train").persist(storage_level)
 
+    start = log_step(f"START train-only categorical vocabulary stats for {len(categorical_cols)} columns")
     vocab_stats = vocabulary_stats(train_examples, categorical_cols)
+    log_done("Vocabulary stats", start)
+
+    start = log_step(f"START train-only numeric transform stats for {len(numeric_cols)} columns")
     transform_stats = numerical_transform_stats(train_examples, numeric_cols)
+    log_done("Numeric transform stats", start)
+
     feature_catalog = build_feature_catalog()
+    log_step(f"Feature catalog prepared with {len(feature_catalog)} records")
+
+    start = log_step("START quality checks")
     checks = quality_checks(examples)
     if not checks["passed"]:
         raise AssertionError(f"Two-tower gold quality checks failed: {checks}")
+    log_done(f"Quality checks passed: {json.dumps(checks, sort_keys=True)}", start)
 
     base_cols = [
         "example_id",
@@ -578,29 +619,38 @@ def write_gold_dataset(args: argparse.Namespace) -> dict:
     split_output_cols = base_cols
 
     for split in ["train", "validation", "test"]:
-        write_parquet(examples.where(F.col("split") == split).select(*split_output_cols), args.output_dir / split, args.overwrite)
-        write_parquet(
+        write_parquet_logged(
+            examples.where(F.col("split") == split).select(*split_output_cols),
+            args.output_dir / split,
+            args.overwrite,
+            f"{split} core examples",
+        )
+        write_parquet_logged(
             examples.where(F.col("split") == split).select("example_id", "context_id", "user_id", "video_id", "as_of_time", *target_cols),
             args.output_dir / "targets" / split,
             args.overwrite,
+            f"{split} targets",
         )
-        write_parquet(
+        write_parquet_logged(
             examples.where(F.col("split") == split).select("example_id", "context_id", "user_id", "session_id", *user_cols),
             args.output_dir / "user_state" / split,
             args.overwrite,
+            f"{split} user_state",
         )
-        write_parquet(
+        write_parquet_logged(
             examples.where(F.col("split") == split).select("example_id", "video_id", "as_of_time", *item_cols),
             args.output_dir / "item_features" / "point_in_time" / split,
             args.overwrite,
+            f"{split} point-in-time item features",
         )
 
     item_feature_cols = ["video_id", "author_id", *ITEM_STATIC_CATEGORICAL, "upload_date", *[c for c in ITEM_STATIC_NUMERIC if c != "upload_age_days_at_event"]]
     item_feature_cols = [c for c in item_feature_cols if c in tables["videos_basic"].columns]
-    write_parquet(
+    write_parquet_logged(
         tables["videos_basic"].select(*item_feature_cols).dropDuplicates(["video_id"]),
         args.output_dir / "item_features" / "static",
         args.overwrite,
+        "static item features",
     )
 
     history_cols = [
@@ -616,18 +666,34 @@ def write_gold_dataset(args: argparse.Namespace) -> dict:
         "engagement_strength",
         *[c for c in DIRECT_FEEDBACK_COLS if c in examples.columns],
     ]
-    write_parquet(examples.select(*history_cols), args.output_dir / "history" / "events", args.overwrite)
+    write_parquet_logged(
+        examples.select(*history_cols),
+        args.output_dir / "history" / "events",
+        args.overwrite,
+        "history events",
+    )
 
     vocab_dir = args.output_dir / "vocabularies"
     for col in categorical_cols:
-        write_parquet(build_vocabulary(train_examples, col), vocab_dir / col, args.overwrite)
+        write_parquet_logged(
+            build_vocabulary(train_examples, col),
+            vocab_dir / col,
+            args.overwrite,
+            f"vocabulary {col}",
+        )
     transforms_dir = args.output_dir / "transforms"
     transforms_dir.mkdir(parents=True, exist_ok=True)
+    log_step("Writing JSON metadata files")
     write_json({"version": "numeric_transforms_v1", "fit_split": "train", "features": transform_stats}, transforms_dir / "numeric_stats.json")
     write_json({"version": "categorical_vocabs_v1", "unknown_token": UNKNOWN_TOKEN, "features": vocab_stats}, vocab_dir / "manifest.json")
     write_json({"version": FEATURE_CATALOG_VERSION, "features": feature_catalog}, args.output_dir / "feature_catalog.json")
 
+    start = log_step("START final split/cold-start summaries")
     examples_summary = split_counts(examples)
+    source_event_summary = split_summary(examples.select("split", "user_id", "video_id", "event_ts"))
+    cold_start = cold_start_stats(examples)
+    log_done("Final split/cold-start summaries", start)
+
     manifest = {
         "gold_dataset_version": args.version,
         "generated_at": datetime.now(timezone.utc).isoformat(),
@@ -635,7 +701,7 @@ def write_gold_dataset(args: argparse.Namespace) -> dict:
         "output_path": str(args.output_dir),
         "code_commit": git_commit(),
         "temporal_split": split_meta,
-        "source_event_summary": split_summary(examples.select("split", "user_id", "video_id", "event_ts")),
+        "source_event_summary": source_event_summary,
         "example_summary": examples_summary,
         "feature_catalog_version": FEATURE_CATALOG_VERSION,
         "target_definition": {
@@ -657,7 +723,7 @@ def write_gold_dataset(args: argparse.Namespace) -> dict:
             "reserved_for_ranker": ["tag", "user_item_similarity", "future ALS/user-item cross scores"],
             "dropped": ["videos_statistics global counters/rates with unclear snapshot time", "current-event watch/play outcomes as features"],
         },
-        "cold_start": cold_start_stats(examples),
+        "cold_start": cold_start,
         "vocabularies": {"version": "categorical_vocabs_v1", "fit_split": "train", "features": vocab_stats},
         "numerical_transforms": {"version": "numeric_transforms_v1", "fit_split": "train", "features": list(transform_stats)},
         "quality_checks": checks,
@@ -677,6 +743,7 @@ def write_gold_dataset(args: argparse.Namespace) -> dict:
         },
     }
     write_json(manifest, args.output_dir / "manifest.json")
+    log_done("Two-tower Gold build", pipeline_start)
     print(json.dumps(manifest, indent=2, sort_keys=True))
     spark.stop()
     return manifest
