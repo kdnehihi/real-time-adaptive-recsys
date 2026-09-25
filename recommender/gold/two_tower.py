@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import argparse
 import json
+import os
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Iterable
@@ -95,6 +96,18 @@ TARGET_COLS = [
     "duration_ms",
     "watch_ratio",
 ]
+
+
+def storage_level_from_env() -> StorageLevel:
+    raw = os.getenv("TWO_TOWER_STORAGE_LEVEL", "DISK_ONLY").upper()
+    choices = {
+        "DISK_ONLY": StorageLevel.DISK_ONLY,
+        "MEMORY_ONLY": StorageLevel.MEMORY_ONLY,
+        "MEMORY_AND_DISK": StorageLevel.MEMORY_AND_DISK,
+    }
+    if raw not in choices:
+        raise ValueError(f"Unknown TWO_TOWER_STORAGE_LEVEL={raw}. Use one of {sorted(choices)}")
+    return choices[raw]
 
 
 def read_silver_tables(spark: SparkSession, silver_dir: Path) -> dict[str, DataFrame]:
@@ -517,7 +530,8 @@ def write_gold_dataset(args: argparse.Namespace) -> dict:
         args.validation_quantile,
         args.weak_watch_ratio_threshold,
     )
-    examples = add_cold_start_flags(examples).persist(StorageLevel.MEMORY_ONLY)
+    storage_level = storage_level_from_env()
+    examples = add_cold_start_flags(examples).persist(storage_level)
 
     categorical_cols = [c for c in USER_STATIC_CATEGORICAL + ITEM_STATIC_CATEGORICAL if c in examples.columns]
     numeric_cols = [
@@ -530,7 +544,7 @@ def write_gold_dataset(args: argparse.Namespace) -> dict:
         + ITEM_HISTORY_NUMERIC
         if c in examples.columns
     ]
-    train_examples = examples.where(F.col("split") == "train").persist(StorageLevel.MEMORY_ONLY)
+    train_examples = examples.where(F.col("split") == "train").persist(storage_level)
 
     vocab_stats = vocabulary_stats(train_examples, categorical_cols)
     transform_stats = numerical_transform_stats(train_examples, numeric_cols)
