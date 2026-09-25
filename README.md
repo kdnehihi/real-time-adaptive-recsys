@@ -154,3 +154,17 @@ python scripts/build_kuairand_two_tower_gold.py \
 Outputs include split core example tables, user-state features, item static and point-in-time features, targets, history references, train-only vocabularies, train-only numerical transform stats, `feature_catalog.json`, and `manifest.json`.
 
 Use `notebooks/04_kuairand_two_tower_data_preparation.ipynb` to inspect the generated artifact.
+
+For Colab High-RAM CPU builds, upload these Silver tables to Drive:
+
+```text
+MyDrive/recsys/data/silver/kuairand/interactions/
+MyDrive/recsys/data/silver/kuairand/users/
+MyDrive/recsys/data/silver/kuairand/videos_basic/
+```
+
+Then run `notebooks/05_colab_two_tower_gold_build.ipynb`. The output is copied to:
+
+```text
+MyDrive/recsys/data/gold/two_tower/v1_colab/
+```
