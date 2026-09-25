@@ -55,8 +55,10 @@ def get_spark(app_name: str = "recommender", reset: bool = False) -> SparkSessio
             pass
         _clear_spark_state()
 
+    spark_master = os.getenv("SPARK_MASTER", "local[*]")
+
     builder = (
-        SparkSession.builder.master("local[*]")
+        SparkSession.builder.master(spark_master)
         .appName(app_name)
         .config("spark.sql.session.timeZone", "UTC")
         .config("spark.sql.shuffle.partitions", "8")

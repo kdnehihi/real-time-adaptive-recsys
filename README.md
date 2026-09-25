@@ -138,3 +138,19 @@ MyDrive/recsys/data/silver/kuairand/interactions/
 ```
 
 Then open `notebooks/04_colab_als_baseline.ipynb`.
+
+## Build Two-Tower Gold Data
+
+Build point-in-time examples for a future Two-Tower retrieval model. This step does not train a neural model.
+
+```bash
+SPARK_MASTER=local[2] PYSPARK_SUBMIT_ARGS="--driver-memory 10g pyspark-shell" \
+python scripts/build_kuairand_two_tower_gold.py \
+  --silver-dir data/silver/kuairand \
+  --output-dir data/gold/two_tower/v1 \
+  --overwrite
+```
+
+Outputs include split core example tables, user-state features, item static and point-in-time features, targets, history references, train-only vocabularies, train-only numerical transform stats, `feature_catalog.json`, and `manifest.json`.
+
+Use `notebooks/04_kuairand_two_tower_data_preparation.ipynb` to inspect the generated artifact.
