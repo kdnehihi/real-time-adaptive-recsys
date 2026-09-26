@@ -13,8 +13,26 @@ from recommender.models.two_tower.config import TwoTowerFeatureConfig
 from recommender.models.two_tower.preprocessing import FeatureBatchPreprocessor
 
 
+def parquet_files(path: str | Path) -> list[Path]:
+    path = Path(path)
+    if path.is_file():
+        return [path] if path.suffix == ".parquet" else []
+    if not path.exists():
+        raise FileNotFoundError(f"Parquet path does not exist: {path}")
+    files = sorted(p for p in path.rglob("*.parquet") if p.is_file() and not p.name.startswith("."))
+    if not files:
+        visible = sorted(str(p.relative_to(path)) for p in path.iterdir())[:20] if path.is_dir() else []
+        raise FileNotFoundError(f"No parquet files found under {path}. Visible entries: {visible}")
+    return files
+
+
 def read_parquet_head(path: str | Path, max_rows: int | None, columns: list[str] | None = None) -> pd.DataFrame:
-    dataset = ds.dataset(path, format="parquet")
+    files = parquet_files(path)
+    dataset = ds.dataset([str(file) for file in files], format="parquet")
+    if columns:
+        missing = sorted(set(columns) - set(dataset.schema.names))
+        if missing:
+            raise ValueError(f"{path} is missing columns {missing}. Available columns: {dataset.schema.names}")
     if max_rows is None:
         return dataset.to_table(columns=columns).to_pandas()
     return dataset.head(max_rows, columns=columns).to_pandas()
