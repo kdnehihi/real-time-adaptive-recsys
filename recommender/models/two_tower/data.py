@@ -54,19 +54,25 @@ def load_joined_split(
 
     gold_root = Path(gold_root)
     target_set = set(target_classes)
-    core_cols = ["example_id", "user_id", "video_id", "as_of_time", "split", "is_warm_user", "is_warm_item"]
-    target_cols = ["example_id", "target_class", "is_positive", "is_observed_negative", "is_ambiguous"]
+    target_cols = [
+        "example_id",
+        "user_id",
+        "video_id",
+        "as_of_time",
+        "target_class",
+        "is_positive",
+        "is_observed_negative",
+        "is_ambiguous",
+    ]
     user_cols = ["example_id", *config.user_input_features]
     item_cols = ["example_id", *config.item_input_features]
 
-    core = read_parquet_head(gold_root / split, max_examples, core_cols)
     targets = read_parquet_head(gold_root / "targets" / split, max_examples, target_cols)
     user_state = read_parquet_head(gold_root / "user_state" / split, max_examples, user_cols)
     item_features = read_parquet_head(gold_root / "item_features" / "point_in_time" / split, max_examples, item_cols)
 
     frame = (
-        core.merge(targets, on="example_id", how="inner")
-        .merge(user_state, on=["example_id", "user_id"], how="inner")
+        targets.merge(user_state, on=["example_id", "user_id"], how="inner")
         .merge(item_features, on=["example_id", "video_id"], how="inner")
     )
     if target_set:
