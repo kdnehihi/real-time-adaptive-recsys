@@ -191,6 +191,34 @@ validation user query
 
 These metrics are saved as `candidate_validation` in `metrics.json` and `two_tower_candidate_validation` in `comparison_summary.json`. They are much more useful for directional comparison with ALS/popularity than in-batch metrics, although they still use the observed validation candidate set rather than a production full-catalog ANN index.
 
+## Colab Model Comparison
+
+After V1/V2/V3 have finished training, use:
+
+```text
+notebooks/10_colab_two_tower_compare.ipynb
+```
+
+This notebook does not retrain models. It loads the saved `best_model.pt`, `config.json`, and `metrics.json` artifacts from:
+
+```text
+/content/drive/MyDrive/recsys/artifacts/two_tower/
+```
+
+and evaluates all Two-Tower runs on the same validation users, same validation candidate item set, and same relevance labels from:
+
+```text
+/content/drive/MyDrive/recsys/data/gold/two_tower/v1_colab/
+```
+
+It also includes the saved ALS/popularity summary from:
+
+```text
+/content/drive/MyDrive/recsys/data/gold/als/v1_colab/evaluation_summary.json
+```
+
+Treat V1/V2/V3 rows from this notebook as directly comparable. Treat ALS/popularity as reference rows until ALS is re-scored on the exact same candidate set.
+
 ## Resource Estimate
 
 Local smoke:
