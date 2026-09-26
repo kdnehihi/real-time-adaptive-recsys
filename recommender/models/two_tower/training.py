@@ -54,6 +54,10 @@ class TwoTowerTrainConfig:
     negative_sample_count: int = 0
     max_negative_item_examples: int | None = None
     full_item_vocab_from_train_items: bool = False
+    negative_sampling_strategy: str = "random"
+    popular_negative_fraction: float = 0.0
+    item_popularity_column: str = "item_hist_events"
+    item_popularity_alpha: float = 0.75
     early_stopping_patience: int | None = None
     early_stopping_metric: str = "validation_ndcg@50"
     early_stopping_mode: str = "max"
@@ -137,6 +141,51 @@ def baseline_summary(path: str | None) -> dict[str, Any]:
     }
 
 
+def negative_sampling_probabilities(
+    train_item_pool,
+    column: str,
+    alpha: float,
+) -> np.ndarray:
+    if column not in train_item_pool.columns:
+        raise ValueError(f"Negative sampling column {column!r} is missing from train_item_pool")
+    raw = train_item_pool[column].fillna(0).astype("float64").to_numpy()
+    weights = np.power(np.maximum(raw, 0.0) + 1.0, alpha)
+    total = weights.sum()
+    if total <= 0:
+        return np.full(len(train_item_pool), 1.0 / len(train_item_pool))
+    return weights / total
+
+
+def sample_negative_indices(
+    rng: np.random.Generator,
+    pool_size: int,
+    count: int,
+    strategy: str,
+    popular_fraction: float,
+    popularity_probs: np.ndarray | None,
+) -> np.ndarray:
+    if count <= 0:
+        return np.array([], dtype=np.int64)
+    if strategy == "random":
+        return rng.integers(0, pool_size, size=count)
+    if strategy == "popularity":
+        if popularity_probs is None:
+            raise ValueError("popularity strategy requires popularity_probs")
+        return rng.choice(pool_size, size=count, replace=True, p=popularity_probs)
+    if strategy == "mixed":
+        popular_count = int(round(count * popular_fraction))
+        random_count = count - popular_count
+        parts = []
+        if popular_count:
+            if popularity_probs is None:
+                raise ValueError("mixed strategy requires popularity_probs")
+            parts.append(rng.choice(pool_size, size=popular_count, replace=True, p=popularity_probs))
+        if random_count:
+            parts.append(rng.integers(0, pool_size, size=random_count))
+        return np.concatenate(parts) if parts else np.array([], dtype=np.int64)
+    raise ValueError(f"Unknown negative_sampling_strategy={strategy!r}")
+
+
 def train_two_tower(config: TwoTowerTrainConfig) -> dict[str, Any]:
     set_seed(config.seed)
     feature_config = DEFAULT_CONFIG
@@ -205,6 +254,13 @@ def train_two_tower(config: TwoTowerTrainConfig) -> dict[str, Any]:
         num_workers=config.num_workers,
     )
     negative_rng = np.random.default_rng(config.seed)
+    popularity_probs = None
+    if train_item_pool is not None and config.negative_sampling_strategy in {"popularity", "mixed"}:
+        popularity_probs = negative_sampling_probabilities(
+            train_item_pool,
+            config.item_popularity_column,
+            config.item_popularity_alpha,
+        )
 
     history: list[dict[str, float]] = []
     best_metric: float | None = None
@@ -223,7 +279,14 @@ def train_two_tower(config: TwoTowerTrainConfig) -> dict[str, Any]:
             if config.negative_sample_count > 0:
                 if train_item_pool is None or train_item_pool.empty:
                     raise ValueError("negative_sample_count > 0 requires a non-empty train_item_pool")
-                negative_indices = negative_rng.integers(0, len(train_item_pool), size=config.negative_sample_count)
+                negative_indices = sample_negative_indices(
+                    negative_rng,
+                    len(train_item_pool),
+                    config.negative_sample_count,
+                    config.negative_sampling_strategy,
+                    config.popular_negative_fraction,
+                    popularity_probs,
+                )
                 negative_frame = train_item_pool.iloc[negative_indices].reset_index(drop=True)
                 negative_categorical, negative_numeric = preprocessor.encode_item(negative_frame)
                 negative_categorical = {key: value.to(device) for key, value in negative_categorical.items()}

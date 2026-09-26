@@ -1,8 +1,12 @@
 import torch
+import numpy as np
+import pandas as pd
+import pytest
 
 from recommender.models.two_tower.config import DEFAULT_CONFIG, embedding_table_configs
 from recommender.models.two_tower.evaluation import in_batch_retrieval_metrics
 from recommender.models.two_tower.model import TwoTowerRetrievalModel
+from recommender.models.two_tower.training import negative_sampling_probabilities, sample_negative_indices
 
 
 def test_two_tower_model_forward_shapes():
@@ -55,3 +59,21 @@ def test_in_batch_retrieval_metrics_detect_perfect_ranking():
     assert metrics["recall@1"] == 1.0
     assert metrics["ndcg@1"] == 1.0
     assert metrics["mrr"] == 1.0
+
+
+def test_mixed_negative_sampler_returns_requested_count():
+    pool = pd.DataFrame({"item_hist_events": [0, 10, 100]})
+    probs = negative_sampling_probabilities(pool, "item_hist_events", 0.75)
+    sampled = sample_negative_indices(
+        np.random.default_rng(7),
+        pool_size=3,
+        count=11,
+        strategy="mixed",
+        popular_fraction=0.6,
+        popularity_probs=probs,
+    )
+
+    assert sampled.shape == (11,)
+    assert sampled.min() >= 0
+    assert sampled.max() < 3
+    assert probs.sum() == pytest.approx(1.0)

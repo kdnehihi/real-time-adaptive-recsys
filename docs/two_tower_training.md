@@ -128,6 +128,43 @@ The default V2 artifact path is:
 
 V2 uses `batch_size=2048` because sampled negatives increase the softmax candidate matrix size. If memory is tight, reduce `negative_sample_count` to `2048` before reducing model size.
 
+## Colab V3 Final Run
+
+V3 is the strongest current baseline configuration. It keeps the V2 full item vocabulary and sampled-negative setup, then makes the negatives harder:
+
+```text
+negative_sample_count: 8192
+negative_sampling_strategy: mixed
+popular_negative_fraction: 0.7
+item_popularity_column: item_hist_events
+item_popularity_alpha: 0.75
+temperature: 0.05
+MLP hidden dims: [768, 384]
+```
+
+The intuition is that random negatives are often too easy in a huge short-video catalog. Popularity-weighted negatives are more competitive because they are videos the system is more likely to consider/recommend.
+
+Run:
+
+```text
+notebooks/09_colab_two_tower_v3_final_training.ipynb
+```
+
+or:
+
+```bash
+python scripts/train_two_tower_baseline.py \
+  --config configs/two_tower_colab_v3.json
+```
+
+Artifacts are written to:
+
+```text
+/content/drive/MyDrive/recsys/artifacts/two_tower/baseline_v3/
+```
+
+If memory is tight, reduce `negative_sample_count` from `8192` to `4096`, then reduce `batch_size` from `2048` to `1024`.
+
 ## Metrics
 
 The current Two-Tower metrics are in-batch retrieval metrics:
