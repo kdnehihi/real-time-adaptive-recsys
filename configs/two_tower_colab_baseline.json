@@ -1,6 +1,6 @@
 {
   "run_name": "two_tower_baseline_colab_v1",
-  "gold_root": "/content/drive/MyDrive/recsys/data/gold/two_tower/v1_ready",
+  "gold_root": "/content/drive/MyDrive/recsys/data/gold/two_tower/v1_colab",
   "output_dir": "/content/drive/MyDrive/recsys/artifacts/two_tower/baseline_v1",
   "als_summary_path": "/content/drive/MyDrive/recsys/data/gold/als/v1_colab/evaluation_summary.json",
   "mlflow_tracking_uri": null,

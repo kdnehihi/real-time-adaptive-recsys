@@ -2,7 +2,7 @@
 
 This document describes the first PyTorch training pipeline for the Two-Tower retrieval baseline.
 
-The pipeline uses only Gold data:
+The local pipeline uses only Gold data:
 
 ```text
 data/gold/two_tower/v1_ready/
@@ -68,10 +68,10 @@ python scripts/train_two_tower_baseline.py \
   --config configs/two_tower_colab_baseline.json
 ```
 
-The Colab config assumes:
+The Colab config assumes your Drive artifact is stored at:
 
 ```text
-/content/drive/MyDrive/recsys/data/gold/two_tower/v1_ready/
+/content/drive/MyDrive/recsys/data/gold/two_tower/v1_colab/
 ```
 
 and writes artifacts to:
