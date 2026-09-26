@@ -11,10 +11,12 @@ from recommender.models.two_tower.encoders import (
     NumericalFeatureBlock,
     UserFeatureEncoder,
 )
+from recommender.models.two_tower.model import TwoTowerRetrievalModel
 from recommender.models.two_tower.preprocessing import (
     FeatureBatchPreprocessor,
     NumericalPreprocessor,
 )
+from recommender.models.two_tower.training import TwoTowerTrainConfig, train_two_tower
 from recommender.models.two_tower.vocab import Vocabulary
 
 __all__ = [
@@ -26,6 +28,9 @@ __all__ = [
     "NumericalPreprocessor",
     "TARGET_ONLY_COLUMNS",
     "TwoTowerFeatureConfig",
+    "TwoTowerRetrievalModel",
+    "TwoTowerTrainConfig",
     "UserFeatureEncoder",
     "Vocabulary",
+    "train_two_tower",
 ]
