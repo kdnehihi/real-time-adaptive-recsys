@@ -19,6 +19,9 @@ python-dotenv==1.0.1
 pytest==8.3.2
 setuptools==75.1.0
 
+# Neural feature encoding
+torch==2.3.1
+
 # Optional lightweight hyperparameter tuning for interaction-strength weights
 optuna==3.6.1
 
