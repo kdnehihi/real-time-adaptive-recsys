@@ -111,6 +111,17 @@ Each validation batch forms a small candidate set where the diagonal item is the
 
 These metrics are not yet directly equivalent to the Spark ALS/popularity metrics, which evaluate top-K recommendations over a larger item candidate set.
 
+The Colab notebook also computes a candidate-based validation protocol after training:
+
+```text
+validation user query
+-> score observed validation candidate items
+-> rank candidates
+-> compute HitRate/Recall/NDCG@K against that user's validation STRONG_POSITIVE items
+```
+
+These metrics are saved as `candidate_validation` in `metrics.json` and `two_tower_candidate_validation` in `comparison_summary.json`. They are much more useful for directional comparison with ALS/popularity than in-batch metrics, although they still use the observed validation candidate set rather than a production full-catalog ANN index.
+
 ## Resource Estimate
 
 Local smoke:
