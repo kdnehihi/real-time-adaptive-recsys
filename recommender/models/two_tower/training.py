@@ -12,7 +12,13 @@ from torch import nn
 from torch.utils.data import DataLoader
 
 from recommender.models.two_tower.config import DEFAULT_CONFIG, TwoTowerFeatureConfig, embedding_table_configs
-from recommender.models.two_tower.data import EncodedTwoTowerBatch, TwoTowerCollator, TwoTowerFrameDataset, load_joined_split
+from recommender.models.two_tower.data import (
+    EncodedTwoTowerBatch,
+    TwoTowerCollator,
+    TwoTowerFrameDataset,
+    load_item_feature_pool,
+    load_joined_split,
+)
 from recommender.models.two_tower.evaluation import evaluate_in_batch
 from recommender.models.two_tower.inspection import embedding_parameter_reports
 from recommender.models.two_tower.model import TwoTowerRetrievalModel
@@ -45,6 +51,9 @@ class TwoTowerTrainConfig:
     temperature: float = 0.07
     top_ks: tuple[int, ...] = (10, 50)
     eval_max_batches: int | None = 20
+    negative_sample_count: int = 0
+    max_negative_item_examples: int | None = None
+    full_item_vocab_from_train_items: bool = False
     early_stopping_patience: int | None = None
     early_stopping_metric: str = "validation_ndcg@50"
     early_stopping_mode: str = "max"
@@ -87,6 +96,7 @@ def build_preprocessor_and_tables(
     config: TwoTowerTrainConfig,
     feature_config: TwoTowerFeatureConfig,
     train_frame,
+    train_item_pool=None,
 ) -> tuple[FeatureBatchPreprocessor, dict, dict, dict[str, Vocabulary]]:
     gold_root = Path(config.gold_root)
     vocabularies: dict[str, Vocabulary] = {
@@ -94,7 +104,12 @@ def build_preprocessor_and_tables(
         "video_type": load_parquet_vocabulary(gold_root / "vocabularies" / "video_type", "video_type"),
         "upload_type": load_parquet_vocabulary(gold_root / "vocabularies" / "upload_type", "upload_type"),
         "user_id": Vocabulary.from_values("user_id", train_frame["user_id"].tolist()),
-        "video_id": Vocabulary.from_values("video_id", train_frame["video_id"].tolist()),
+        "video_id": Vocabulary.from_values(
+            "video_id",
+            train_item_pool["video_id"].tolist()
+            if config.full_item_vocab_from_train_items and train_item_pool is not None
+            else train_frame["video_id"].tolist(),
+        ),
     }
     numeric = NumericalPreprocessor.from_json(gold_root / "transforms" / "numeric_stats.json", feature_config.numerical)
     preprocessor = FeatureBatchPreprocessor(feature_config, vocabularies, numeric)
@@ -143,7 +158,21 @@ def train_two_tower(config: TwoTowerTrainConfig) -> dict[str, Any]:
     if validation_frame.empty:
         raise ValueError("No validation examples after filtering target_classes")
 
-    preprocessor, user_tables, item_tables, vocabularies = build_preprocessor_and_tables(config, feature_config, train_frame)
+    train_item_pool = None
+    if config.negative_sample_count > 0 or config.full_item_vocab_from_train_items:
+        train_item_pool = load_item_feature_pool(
+            config.gold_root,
+            "train",
+            config.max_negative_item_examples,
+            feature_config,
+        )
+
+    preprocessor, user_tables, item_tables, vocabularies = build_preprocessor_and_tables(
+        config,
+        feature_config,
+        train_frame,
+        train_item_pool,
+    )
     model = TwoTowerRetrievalModel(
         user_tables=user_tables,
         item_tables=item_tables,
@@ -175,6 +204,7 @@ def train_two_tower(config: TwoTowerTrainConfig) -> dict[str, Any]:
         collate_fn=collator,
         num_workers=config.num_workers,
     )
+    negative_rng = np.random.default_rng(config.seed)
 
     history: list[dict[str, float]] = []
     best_metric: float | None = None
@@ -189,12 +219,24 @@ def train_two_tower(config: TwoTowerTrainConfig) -> dict[str, Any]:
             assert isinstance(batch, EncodedTwoTowerBatch)
             batch = batch.to(device)
             output = model(batch.user_categorical, batch.user_numeric, batch.item_categorical, batch.item_numeric)
-            labels = torch.arange(output.logits.shape[0], device=device)
-            loss = loss_fn(output.logits, labels)
+            logits = output.logits
+            if config.negative_sample_count > 0:
+                if train_item_pool is None or train_item_pool.empty:
+                    raise ValueError("negative_sample_count > 0 requires a non-empty train_item_pool")
+                negative_indices = negative_rng.integers(0, len(train_item_pool), size=config.negative_sample_count)
+                negative_frame = train_item_pool.iloc[negative_indices].reset_index(drop=True)
+                negative_categorical, negative_numeric = preprocessor.encode_item(negative_frame)
+                negative_categorical = {key: value.to(device) for key, value in negative_categorical.items()}
+                negative_numeric = negative_numeric.to(device)
+                negative_embeddings = model.encode_item(negative_categorical, negative_numeric)
+                all_item_embeddings = torch.cat([output.item_embedding, negative_embeddings], dim=0)
+                logits = output.user_embedding @ all_item_embeddings.T / config.temperature
+            labels = torch.arange(logits.shape[0], device=device)
+            loss = loss_fn(logits, labels)
             optimizer.zero_grad(set_to_none=True)
             loss.backward()
             optimizer.step()
-            batch_size = output.logits.shape[0]
+            batch_size = logits.shape[0]
             total_loss += float(loss.item()) * batch_size
             total_examples += batch_size
         epoch_metrics = {"epoch": epoch, "train_loss": total_loss / max(total_examples, 1), "train_examples": total_examples}
@@ -257,6 +299,7 @@ def train_two_tower(config: TwoTowerTrainConfig) -> dict[str, Any]:
         "device": str(device),
         "train_rows_loaded": len(train_frame),
         "validation_rows_loaded": len(validation_frame),
+        "negative_item_rows_loaded": 0 if train_item_pool is None else len(train_item_pool),
         "history": history,
         "final_validation": final_validation,
         "best_epoch": best_epoch,

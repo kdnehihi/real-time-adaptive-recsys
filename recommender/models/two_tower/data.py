@@ -80,6 +80,20 @@ def load_joined_split(
     return frame.reset_index(drop=True)
 
 
+def load_item_feature_pool(
+    gold_root: str | Path,
+    split: str,
+    max_examples: int | None,
+    config: TwoTowerFeatureConfig = TwoTowerFeatureConfig(),
+) -> pd.DataFrame:
+    """Load distinct item-side features for sampled negatives/evaluation."""
+
+    gold_root = Path(gold_root)
+    item_cols = [*config.item_input_features]
+    frame = read_parquet_head(gold_root / "item_features" / "point_in_time" / split, max_examples, item_cols)
+    return frame.drop_duplicates("video_id", keep="last").reset_index(drop=True)
+
+
 @dataclass(frozen=True)
 class EncodedTwoTowerBatch:
     user_categorical: dict[str, torch.Tensor]

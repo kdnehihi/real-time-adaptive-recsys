@@ -96,6 +96,38 @@ early stopping: validation_ndcg@50, patience 3
 
 It writes both `model.pt` and `best_model.pt`.
 
+## Colab V2 Run
+
+V2 is intended to improve the first neural baseline with two changes:
+
+```text
+full_item_vocab_from_train_items: true
+negative_sample_count: 4096
+```
+
+This means `video_id` embeddings are allocated from all train item features, not only positive train pairs, and each training batch scores the positive batch items plus extra sampled item negatives.
+
+Run the self-contained notebook:
+
+```text
+notebooks/08_colab_two_tower_v2_training.ipynb
+```
+
+or use the config:
+
+```bash
+python scripts/train_two_tower_baseline.py \
+  --config configs/two_tower_colab_v2.json
+```
+
+The default V2 artifact path is:
+
+```text
+/content/drive/MyDrive/recsys/artifacts/two_tower/baseline_v2/
+```
+
+V2 uses `batch_size=2048` because sampled negatives increase the softmax candidate matrix size. If memory is tight, reduce `negative_sample_count` to `2048` before reducing model size.
+
 ## Metrics
 
 The current Two-Tower metrics are in-batch retrieval metrics:
