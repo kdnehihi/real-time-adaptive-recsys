@@ -82,6 +82,20 @@ and writes artifacts to:
 
 MLflow is disabled for Colab by default. Metrics and artifacts are always written to disk.
 
+The full Colab config uses all available positive Train/Validation examples:
+
+```text
+max_train_examples: null
+max_validation_examples: null
+batch_size: 4096
+epochs: 10
+retrieval_dim: 128
+MLP hidden dims: [512, 256]
+early stopping: validation_ndcg@50, patience 3
+```
+
+It writes both `model.pt` and `best_model.pt`.
+
 ## Metrics
 
 The current Two-Tower metrics are in-batch retrieval metrics:
@@ -113,11 +127,11 @@ Colab baseline:
 ```text
 GPU: recommended, T4 is acceptable
 System RAM: 25-50 GB is better
-GPU RAM: 15 GB T4 should be OK with batch_size 2048
+GPU RAM: 15 GB T4 should be OK with batch_size 4096 for the current MLP, but reduce to 2048 if memory spikes
 Disk/Drive free space: 10-30 GB
 ```
 
-The first likely bottleneck is Parquet-to-pandas loading, not the MLP itself.
+For the full config, use a High-RAM runtime if possible. If Colab RAM is not enough, reduce `max_train_examples` to `2_000_000` and `max_validation_examples` to `300_000`, then rerun. The first likely bottleneck is Parquet-to-pandas loading, not the MLP itself.
 
 ## Current Limitations
 

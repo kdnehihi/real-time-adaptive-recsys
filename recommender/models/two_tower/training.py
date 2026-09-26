@@ -45,6 +45,10 @@ class TwoTowerTrainConfig:
     temperature: float = 0.07
     top_ks: tuple[int, ...] = (10, 50)
     eval_max_batches: int | None = 20
+    early_stopping_patience: int | None = None
+    early_stopping_metric: str = "validation_ndcg@50"
+    early_stopping_mode: str = "max"
+    early_stopping_min_delta: float = 1e-5
     num_workers: int = 0
     device: str = "auto"
     full_video_vocab_size: int | None = None
@@ -173,6 +177,10 @@ def train_two_tower(config: TwoTowerTrainConfig) -> dict[str, Any]:
     )
 
     history: list[dict[str, float]] = []
+    best_metric: float | None = None
+    best_epoch: int | None = None
+    bad_epochs = 0
+    best_model_path = output_dir / "best_model.pt"
     for epoch in range(1, config.epochs + 1):
         model.train()
         total_loss = 0.0
@@ -193,6 +201,41 @@ def train_two_tower(config: TwoTowerTrainConfig) -> dict[str, Any]:
         epoch_metrics.update({f"validation_{k}": v for k, v in evaluate_in_batch(model, validation_loader, device, config.top_ks, config.eval_max_batches).items()})
         history.append(epoch_metrics)
         print(epoch_metrics)
+
+        current_metric = epoch_metrics.get(config.early_stopping_metric)
+        if isinstance(current_metric, (int, float)):
+            improved = (
+                best_metric is None
+                or (
+                    config.early_stopping_mode == "max"
+                    and current_metric > best_metric + config.early_stopping_min_delta
+                )
+                or (
+                    config.early_stopping_mode == "min"
+                    and current_metric < best_metric - config.early_stopping_min_delta
+                )
+            )
+            if improved:
+                best_metric = float(current_metric)
+                best_epoch = epoch
+                bad_epochs = 0
+                torch.save(
+                    {
+                        "model_state_dict": model.state_dict(),
+                        "config": asdict(config),
+                        "best_epoch": best_epoch,
+                        "best_metric": best_metric,
+                    },
+                    best_model_path,
+                )
+            else:
+                bad_epochs += 1
+                if config.early_stopping_patience is not None and bad_epochs >= config.early_stopping_patience:
+                    print(
+                        f"Early stopping at epoch {epoch}; best {config.early_stopping_metric}="
+                        f"{best_metric} at epoch {best_epoch}"
+                    )
+                    break
 
     final_validation = evaluate_in_batch(model, validation_loader, device, config.top_ks, config.eval_max_batches)
     model_path = output_dir / "model.pt"
@@ -216,6 +259,9 @@ def train_two_tower(config: TwoTowerTrainConfig) -> dict[str, Any]:
         "validation_rows_loaded": len(validation_frame),
         "history": history,
         "final_validation": final_validation,
+        "best_epoch": best_epoch,
+        "best_metric": best_metric,
+        "best_model_path": str(best_model_path) if best_model_path.exists() else None,
         "embedding_parameter_report": reports,
         "model_parameter_count": sum(p.numel() for p in model.parameters()),
         "baseline_summary": baseline_summary(config.als_summary_path),
