@@ -50,6 +50,8 @@ The V6 evaluator now samples users and their timelines deterministically to avoi
 
 ## Next implementation
 
+The V5 v2 implementation is available in `scripts/train_adaptive_v5_ranker_v2.py` and `notebooks/19_colab_v5_ranker_v2_listwise_training.ipynb`.
+
 1. Train V5 v2 with candidate groups produced by V4 and a ranking-aware objective.
 2. Use validation NDCG@10 or NDCG@50 for checkpoint selection and early stopping.
 3. Include harder negatives near the top of V4's ordering, while retaining some popularity and random negatives.

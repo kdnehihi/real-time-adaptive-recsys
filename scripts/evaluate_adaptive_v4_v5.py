@@ -43,6 +43,7 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--retrieval-candidates", type=int, default=1000)
     parser.add_argument("--top-ks", default="10,50,100")
     parser.add_argument("--popularity-blend-grid", default="0.0,0.02,0.05,0.08")
+    parser.add_argument("--v5-candidate-blend-weight", type=float, default=0.0)
     parser.add_argument("--item-batch-size", type=int, default=8192)
     parser.add_argument("--query-batch-size", type=int, default=64)
     parser.add_argument("--device", default="auto")
@@ -186,9 +187,29 @@ def main() -> None:
         }
         blend_results.append(metrics)
 
+    serving_idx = v4_idx
+    serving_scores = v4_scores
+    serving_user_emb = user_emb
+    if args.v5_candidate_blend_weight != 0.0:
+        serving_user_emb, serving_idx, serving_scores = retrieve_for_queries(
+            artifacts,
+            query_frame,
+            item_ids,
+            item_emb,
+            args.retrieval_candidates,
+            args.query_batch_size,
+            item_score_bias=float(args.v5_candidate_blend_weight) * popularity,
+        )
     print("reranking with V5...")
-    v5_scores = rerank_with_v5(artifacts, user_emb, item_emb, v4_idx, v4_scores, args.query_batch_size)
-    v5_metrics = compare_rankings(item_ids, v4_idx, v5_scores, query_frame, relevance_frame, top_ks)
+    v5_scores = rerank_with_v5(
+        artifacts,
+        serving_user_emb,
+        item_emb,
+        serving_idx,
+        serving_scores,
+        args.query_batch_size,
+    )
+    v5_metrics = compare_rankings(item_ids, serving_idx, v5_scores, query_frame, relevance_frame, top_ks)
     ranker_delta = {
         metric: float(v5_metrics["v5_multi_positive"].get(metric, 0.0) - v5_metrics["v4_multi_positive"].get(metric, 0.0))
         for metric in v5_metrics["v5_multi_positive"]
@@ -202,6 +223,7 @@ def main() -> None:
             "queries": int(len(query_frame)),
             "candidate_items": int(len(item_ids)),
             "retrieval_candidates": int(args.retrieval_candidates),
+            "v5_candidate_blend_weight": float(args.v5_candidate_blend_weight),
             "top_ks": list(top_ks),
         },
         "v4_raw": raw_metrics,

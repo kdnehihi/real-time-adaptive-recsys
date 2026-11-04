@@ -8,6 +8,7 @@ from recommender.models.adaptive.checkpoint import (
     ITEM_NUMERIC,
     USER_NUMERIC,
     NumericalPreprocessor,
+    V5ResidualRanker,
     V4TransformerRetrieval,
     V5Ranker,
     Vocabulary,
@@ -92,3 +93,15 @@ def test_multi_positive_metrics_distinguish_queries_from_users():
     assert metrics["evaluated_queries"] == 3
     assert metrics["evaluated_users"] == 2
     assert metrics["hitrate@3"] == 1.0
+
+
+def test_residual_ranker_initially_preserves_v4_order():
+    ranker = V5ResidualRanker(8, [16, 8], 0.0).eval()
+    user = torch.randn(5, 8)
+    item = torch.randn(5, 8)
+    v4_scores = torch.tensor([-1.2, -0.4, 0.0, 0.7, 1.6])
+
+    with torch.no_grad():
+        ranker_scores = ranker(user, item, v4_scores)
+
+    assert torch.equal(torch.argsort(ranker_scores), torch.argsort(v4_scores))

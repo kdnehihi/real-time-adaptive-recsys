@@ -419,6 +419,31 @@ class V5Ranker(nn.Module):
         return self.net(torch.nan_to_num(features, nan=0.0, posinf=1.0, neginf=-1.0)).squeeze(1)
 
 
+class V5ResidualRanker(nn.Module):
+    """Ranking-aware V5 that starts as a monotonic copy of the V4 ordering."""
+
+    def __init__(self, retrieval_dim: int, hidden_dims: tuple[int, ...] | list[int], dropout: float):
+        super().__init__()
+        self.delta = mlp(retrieval_dim * 4 + 1, tuple(hidden_dims), 1, dropout)
+        final_layer = self.delta[-1]
+        if isinstance(final_layer, nn.Linear):
+            nn.init.zeros_(final_layer.weight)
+            nn.init.zeros_(final_layer.bias)
+        self.raw_base_weight = nn.Parameter(torch.tensor(0.54132485))
+
+    def forward(self, user_emb: torch.Tensor, item_emb: torch.Tensor, v4_score: torch.Tensor) -> torch.Tensor:
+        user_emb = torch.nan_to_num(user_emb, nan=0.0, posinf=0.0, neginf=0.0)
+        item_emb = torch.nan_to_num(item_emb, nan=0.0, posinf=0.0, neginf=0.0)
+        v4_score = torch.nan_to_num(v4_score, nan=0.0, posinf=5.0, neginf=-5.0).clamp(-5.0, 5.0)
+        features = torch.cat(
+            [user_emb, item_emb, user_emb * item_emb, torch.abs(user_emb - item_emb), v4_score[:, None]],
+            dim=1,
+        )
+        delta = self.delta(torch.nan_to_num(features, nan=0.0, posinf=5.0, neginf=-5.0)).squeeze(1)
+        base_weight = F.softplus(self.raw_base_weight)
+        return base_weight * v4_score + delta
+
+
 @dataclass
 class LoadedAdaptiveArtifacts:
     v4: V4TransformerRetrieval
@@ -494,7 +519,8 @@ def load_artifacts(
     if v5_dir is not None and (v5_dir / "best_model.pt").exists():
         v5_ckpt = torch.load(v5_dir / "best_model.pt", map_location="cpu")
         v5_cfg = v5_ckpt["config"]
-        v5 = V5Ranker(int(v4_cfg["retrieval_dim"]), tuple(v5_cfg["hidden_dims"]), float(v5_cfg["dropout"]))
+        ranker_class = V5ResidualRanker if v5_cfg.get("model_type") == "residual_listwise_v2" else V5Ranker
+        v5 = ranker_class(int(v4_cfg["retrieval_dim"]), tuple(v5_cfg["hidden_dims"]), float(v5_cfg["dropout"]))
         v5.load_state_dict(v5_ckpt["model_state_dict"])
         del v5_ckpt
         gc.collect()
@@ -552,6 +578,7 @@ def retrieve_for_queries(
     item_emb: np.ndarray,
     retrieval_candidates: int,
     batch_size: int,
+    item_score_bias: np.ndarray | None = None,
 ) -> tuple[np.ndarray, np.ndarray, np.ndarray]:
     """Run exact matrix retrieval for query users against candidate items."""
     user_emb = encode_users(artifacts.v4, query_frame, artifacts, batch_size=batch_size)
@@ -559,6 +586,8 @@ def retrieve_for_queries(
     score_parts: list[np.ndarray] = []
     for start in range(0, len(user_emb), batch_size):
         scores = np.nan_to_num(user_emb[start : start + batch_size] @ item_emb.T, nan=-1e4, posinf=1e4, neginf=-1e4)
+        if item_score_bias is not None:
+            scores = scores + item_score_bias[None, :]
         idx, vals = top_indices(scores, retrieval_candidates)
         idx_parts.append(idx)
         score_parts.append(vals.astype("float32"))
@@ -577,6 +606,16 @@ def rerank_with_v5(
     """Score the same V4 candidates with the V5 ranker."""
     if artifacts.v5 is None:
         raise ValueError("V5 checkpoint was not loaded.")
+    ranker_scores = v4_scores
+    if artifacts.v5_cfg and artifacts.v5_cfg.get("model_type") == "residual_listwise_v2":
+        score_mean = v4_scores.mean(axis=1, keepdims=True)
+        score_std = v4_scores.std(axis=1, keepdims=True)
+        ranker_scores = np.nan_to_num(
+            (v4_scores - score_mean) / (score_std + 1e-6),
+            nan=0.0,
+            posinf=5.0,
+            neginf=-5.0,
+        ).astype("float32")
     outputs: list[np.ndarray] = []
     for start in range(0, len(user_emb), batch_queries):
         end = min(start + batch_queries, len(user_emb))
@@ -584,7 +623,7 @@ def rerank_with_v5(
         flat_item: list[np.ndarray] = []
         flat_score: list[float] = []
         for row in range(start, end):
-            for item_pos, score in zip(candidate_idx[row], v4_scores[row]):
+            for item_pos, score in zip(candidate_idx[row], ranker_scores[row]):
                 flat_user.append(user_emb[row])
                 flat_item.append(item_emb[item_pos])
                 flat_score.append(float(score))
