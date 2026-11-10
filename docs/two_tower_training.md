@@ -107,13 +107,7 @@ negative_sample_count: 4096
 
 This means `video_id` embeddings are allocated from all train item features, not only positive train pairs, and each training batch scores the positive batch items plus extra sampled item negatives.
 
-Run the self-contained notebook:
-
-```text
-notebooks/08_colab_two_tower_v2_training.ipynb
-```
-
-or use the config:
+The V2 experiment notebook was superseded by the selected V3 workflow and removed. Reproduce the historical V2 configuration with:
 
 ```bash
 python scripts/train_two_tower_baseline.py \
