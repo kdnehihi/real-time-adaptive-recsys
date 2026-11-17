@@ -25,6 +25,8 @@ def test_query_selection_is_deterministic_and_stratified():
             "as_of_time": pd.date_range("2022-01-01", periods=12, freq="h"),
             "current_time_ms": list(range(12)),
             "recent_event_count": [0, 1, 2, 4, 5, 8, 12, 19, 20, 25, 30, 40],
+            "session_recent_event_count": [0, 1, 2, 4, 5, 8, 12, 19, 20, 25, 30, 40],
+            "session_seconds_since_last_event": [None] + [30.0] * 11,
         }
     )
     indexed = build_index(frame)
@@ -34,10 +36,37 @@ def test_query_selection_is_deterministic_and_stratified():
 
     assert first == second
     assert len(first) == 8
-    assert set(selected["history_bucket"]) == {
+    assert set(selected["session_history_bucket"]) == {
         "empty",
         "short_1_4",
         "medium_5_19",
         "long_20_plus",
     }
     assert set(selected["timeline_bucket"]) == {"early", "middle", "late"}
+    assert "global_history_bucket" in selected
+
+
+def test_selection_uses_session_history_not_capped_global_sequence_length():
+    frame = pd.DataFrame(
+        {
+            "example_id": [f"e{index}" for index in range(8)],
+            "user_id": [1] * 8,
+            "video_id": list(range(100, 108)),
+            "as_of_time": pd.date_range("2022-01-01", periods=8, freq="h"),
+            "current_time_ms": list(range(8)),
+            "recent_event_count": [30] * 8,
+            "session_recent_event_count": [0, 1, 4, 5, 10, 19, 20, 30],
+            "session_seconds_since_last_event": [None] + [15.0] * 7,
+        }
+    )
+    indexed = build_index(frame)
+    selected_ids = select_user_queries(indexed, maximum=6)
+    selected = indexed[indexed["example_id"].isin(selected_ids)]
+
+    assert indexed["global_history_bucket"].nunique() == 1
+    assert set(selected["session_history_bucket"]) == {
+        "empty",
+        "short_1_4",
+        "medium_5_19",
+        "long_20_plus",
+    }

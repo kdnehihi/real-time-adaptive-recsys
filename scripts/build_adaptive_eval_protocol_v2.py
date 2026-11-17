@@ -66,7 +66,7 @@ def evenly_spaced_indices(length: int, count: int) -> list[int]:
 
 
 def select_user_queries(group: pd.DataFrame, maximum: int) -> list[object]:
-    """Select history/timeline strata first, then fill evenly across the timeline."""
+    """Select session-history/timeline strata, then fill evenly over time."""
     ordered = group.sort_values(["as_of_time", "example_id"]).reset_index(drop=True)
     selected: list[object] = []
 
@@ -75,7 +75,7 @@ def select_user_queries(group: pd.DataFrame, maximum: int) -> list[object]:
             selected.append(example_id)
 
     for bucket in HISTORY_BUCKET_ORDER:
-        part = ordered[ordered["history_bucket"].eq(bucket)]
+        part = ordered[ordered["session_history_bucket"].eq(bucket)]
         if not part.empty:
             add(part.iloc[len(part) // 2]["example_id"])
     for bucket in TIMELINE_BUCKET_ORDER:
@@ -96,12 +96,25 @@ def build_index(frame: pd.DataFrame) -> pd.DataFrame:
     frame["recent_event_count"] = (
         pd.to_numeric(frame["recent_event_count"], errors="coerce").fillna(0).clip(lower=0).astype("int64")
     )
+    frame["session_recent_event_count"] = (
+        pd.to_numeric(frame["session_recent_event_count"], errors="coerce")
+        .fillna(0)
+        .clip(lower=0)
+        .astype("int64")
+    )
+    frame["session_seconds_since_last_event"] = pd.to_numeric(
+        frame["session_seconds_since_last_event"], errors="coerce"
+    )
     frame = frame.sort_values(["user_id", "as_of_time", "example_id"]).reset_index(drop=True)
     frame["positive_index"] = frame.groupby("user_id").cumcount()
     frame["positive_count"] = frame.groupby("user_id")["example_id"].transform("size")
     denominator = (frame["positive_count"] - 1).clip(lower=1)
     frame["timeline_fraction"] = frame["positive_index"] / denominator
-    frame["history_bucket"] = frame["recent_event_count"].map(history_bucket)
+    # recent_event_count is capped by the model sequence length (currently 30),
+    # so it is useful model context but not a reliable lifecycle segment. Session
+    # history varies naturally and is the primary adaptive-evaluation stratum.
+    frame["global_history_bucket"] = frame["recent_event_count"].map(history_bucket)
+    frame["session_history_bucket"] = frame["session_recent_event_count"].map(history_bucket)
     frame["timeline_bucket"] = frame["timeline_fraction"].map(timeline_bucket)
     return frame
 
@@ -131,7 +144,16 @@ def main() -> None:
     print("loading positive query index...", flush=True)
     index = read_parquet(
         source,
-        ["example_id", "user_id", "video_id", "as_of_time", "current_time_ms", "recent_event_count"],
+        [
+            "example_id",
+            "user_id",
+            "video_id",
+            "as_of_time",
+            "current_time_ms",
+            "recent_event_count",
+            "session_recent_event_count",
+            "session_seconds_since_last_event",
+        ],
         None,
         ds.field("target_class") == "STRONG_POSITIVE",
     )
@@ -177,16 +199,21 @@ def main() -> None:
     selected["relevance_policy"] = "exact_target_at_query_time"
     selected["seen_filter_policy"] = "exclude_prior_items_except_exact_repeat_target"
     selected["protocol_version"] = "adaptive_eval_v2"
+    selected["builder_revision"] = "2.1-session-history"
 
     output_columns = [
         "protocol_version",
+        "builder_revision",
         "example_id",
         "user_id",
         "video_id",
         "as_of_time",
         "query_time_ms",
         "recent_event_count",
-        "history_bucket",
+        "global_history_bucket",
+        "session_recent_event_count",
+        "session_history_bucket",
+        "session_seconds_since_last_event",
         "positive_index",
         "positive_count",
         "timeline_fraction",
@@ -205,6 +232,7 @@ def main() -> None:
     per_user = selected.groupby("user_id").size()
     summary = {
         "protocol_version": "adaptive_eval_v2",
+        "builder_revision": "2.1-session-history",
         "split": args.split,
         "source_positive_rows": int(len(index)),
         "queries": int(len(selected)),
@@ -220,7 +248,8 @@ def main() -> None:
         "recent_repeat_target_rate": float(selected["target_repeated_in_recent_history"].mean()),
         "rows_with_sanitized_events": rows_with_sanitized_events,
         "sanitized_events": sanitized_events,
-        "history_distribution": distribution(selected, "history_bucket"),
+        "session_history_distribution": distribution(selected, "session_history_bucket"),
+        "global_sequence_length_distribution": distribution(selected, "global_history_bucket"),
         "timeline_distribution": distribution(selected, "timeline_bucket"),
         "evaluation_rules": {
             "primary_relevance": "exact target video_id at query time",
@@ -229,6 +258,7 @@ def main() -> None:
             "seen_filter": "exclude prior items, except an exact repeated target remains eligible",
             "bootstrap_unit": "user",
             "candidate_eligibility": "must be enforced in step A2",
+            "history_segmentation": "session_recent_event_count; recent_event_count is sequence-capped context only",
         },
         "artifact_paths": {
             "queries": str(args.output_dir / "queries.parquet"),
