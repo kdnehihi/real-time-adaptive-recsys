@@ -111,3 +111,12 @@ user timeline instead of only the latest event:
 If exact Recall@1000 remains low under this corrected protocol, the next model
 should be a multi-interest, content-aware retrieval model rather than another
 second-stage ranker.
+
+### Step A1 implementation
+
+`21_colab_build_adaptive_eval_protocol_v2.ipynb` and
+`scripts/build_adaptive_eval_protocol_v2.py` materialize this protocol as a
+reusable Drive artifact. The builder selects up to 12 deterministic queries per
+user, prioritizes history and early/middle/late timeline strata, labels
+warm/cold and recent-repeat targets, sanitizes sequence timestamps, and stores
+exact-target relevance metadata. It does not train or evaluate a model.
