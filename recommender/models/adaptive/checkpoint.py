@@ -373,7 +373,14 @@ class V4TransformerRetrieval(nn.Module):
             batch_first=True,
             activation="gelu",
         )
-        self.transformer = nn.TransformerEncoder(layer, int(cfg["transformer_layers"]))
+        # Nested-tensor inference crashes when an entire batch contains only
+        # padding. Empty post-sanitize histories are valid, so keep the stable
+        # padded-tensor path and handle those rows explicitly below.
+        self.transformer = nn.TransformerEncoder(
+            layer,
+            int(cfg["transformer_layers"]),
+            enable_nested_tensor=False,
+        )
         self.short_proj = nn.Sequential(nn.LayerNorm(transformer_dim), nn.Linear(transformer_dim, retrieval_dim), nn.ReLU())
         self.long_user = mlp(8 + 4 + len(USER_NUMERIC), tuple(cfg["user_hidden_dims"]), retrieval_dim, float(cfg["dropout"]))
         self.item_tower = mlp(16 + 3 + 8 + len(ITEM_NUMERIC), tuple(cfg["item_hidden_dims"]), retrieval_dim, float(cfg["dropout"]))
@@ -385,10 +392,22 @@ class V4TransformerRetrieval(nn.Module):
         token = token + self.seq_signal_proj(batch["seq_signals"])
         token = token + self.seq_time_emb(batch["seq_time_bucket"].clamp(0, 31))
         mask = batch["seq_padding_mask"]
-        encoded = self.transformer(token, src_key_padding_mask=mask)
-        valid = (~mask).float().unsqueeze(-1)
+        has_history = (~mask).any(dim=1)
+        output_dim = self.short_proj[1].out_features
+        short_repr = token.new_zeros((token.shape[0], output_dim))
+        if not has_history.any():
+            return short_repr
+
+        # Attention is evaluated only for rows with at least one real event.
+        # Rows with empty history receive a zero short-term representation and
+        # therefore fall back to the long-term branch through the learned gate.
+        valid_token = token[has_history]
+        valid_mask = mask[has_history]
+        encoded = self.transformer(valid_token, src_key_padding_mask=valid_mask)
+        valid = (~valid_mask).to(encoded.dtype).unsqueeze(-1)
         pooled = (encoded * valid).sum(1) / valid.sum(1).clamp_min(1.0)
-        return self.short_proj(pooled)
+        short_repr[has_history] = self.short_proj(pooled)
+        return short_repr
 
     def encode_user(self, batch: dict[str, torch.Tensor]) -> torch.Tensor:
         long_features = torch.cat([self.user_id_emb(batch["user_id"]), self.user_active_emb(batch["user_active_degree"]), batch["user_numeric"]], dim=1)

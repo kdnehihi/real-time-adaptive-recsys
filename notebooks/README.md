@@ -25,6 +25,7 @@ The earlier V1 and V2 training notebooks were removed after V3 became the select
 2. `12_colab_v4_adaptive_retrieval_training.ipynb` - train and export the V4 Transformer retrieval checkpoint.
 3. `18_colab_adaptive_v4_v5_v6_evaluation.ipynb` - run controlled V4/V5 evaluation and V6 replay.
 4. `19_colab_v5_ranker_v2_listwise_training.ipynb` - train the validation-driven residual listwise V5 v2 ranker.
+5. `20_colab_adaptive_retrieval_evaluation_audit.ipynb` - audit controlled Top-1000 candidate coverage, bootstrap uncertainty, and cold/warm plus history-length segments before introducing a stronger retrieval algorithm.
 
 The pointwise V5, standalone V6, and checkpoint-only combined notebooks were removed because notebooks 18 and 19 replace those workflows.
 
@@ -33,5 +34,6 @@ The pointwise V5, standalone V6, and checkpoint-only combined notebooks were rem
 - V3 remains the stable static benchmark.
 - V4 with popularity blend `0.02` improves Top-10 quality but not all deeper-ranking metrics.
 - The original pointwise V5 checkpoint is rejected.
-- V5 v2 is the active ranker experiment and must pass the controlled same-candidate validation before use in V6.
+- V5 v2 is retained as an experiment but is rejected for serving because controlled same-candidate validation is below V4.
+- Notebook 20 is the next required gate: it determines whether the next improvement should target candidate retrieval or ranking.
 - The adaptive test split must be rebuilt before final locked test reporting.

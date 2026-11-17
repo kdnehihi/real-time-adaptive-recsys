@@ -82,6 +82,59 @@ def test_v4_v5_forward_shapes(tmp_path):
     assert torch.isfinite(ranker_scores).all()
 
 
+def test_v4_handles_fully_empty_sequence_batch(tmp_path):
+    stats_path = tmp_path / "numeric_stats.json"
+    stats_path.write_text(json.dumps({"features": {}}))
+    numeric = NumericalPreprocessor(stats_path)
+    vocabs = {
+        "user_id": Vocabulary("user_id", [1, 2, 3]),
+        "video_id": Vocabulary("video_id", [10, 11, 12]),
+        "user_active_degree": Vocabulary("user_active_degree", ["A"]),
+        "video_type": Vocabulary("video_type", ["NORMAL"]),
+        "upload_type": Vocabulary("upload_type", ["USER"]),
+        "event_type": Vocabulary(
+            "event_type",
+            ["AMBIGUOUS_WEAK", "OBSERVED_NEGATIVE", "STRONG_POSITIVE"],
+        ),
+    }
+    config = {
+        "retrieval_dim": 8,
+        "transformer_dim": 16,
+        "transformer_heads": 4,
+        "transformer_layers": 1,
+        "transformer_dropout": 0.0,
+        "user_hidden_dims": [16],
+        "item_hidden_dims": [16],
+        "dropout": 0.0,
+    }
+    frame = _frame()
+    sequence_columns = [
+        "recent_video_ids",
+        "recent_target_classes",
+        "recent_engagement_strengths",
+        "recent_long_views",
+        "recent_likes",
+        "recent_hates",
+        "recent_clicks",
+        "recent_time_ms",
+    ]
+    for column in sequence_columns:
+        frame[column] = [[] for _ in range(len(frame))]
+
+    batch = encode_frame(frame, vocabs, numeric, max_len=4)
+    model = V4TransformerRetrieval(
+        {name: vocab.size for name, vocab in vocabs.items()}, config
+    ).eval()
+    with torch.no_grad():
+        short_embeddings = model.encode_sequence(batch)
+        user_embeddings = model.encode_user(batch)
+
+    assert batch["seq_padding_mask"].all()
+    assert torch.equal(short_embeddings, torch.zeros_like(short_embeddings))
+    assert user_embeddings.shape == (3, 8)
+    assert torch.isfinite(user_embeddings).all()
+
+
 def test_multi_positive_metrics_distinguish_queries_from_users():
     candidate_ids = np.array([10, 11, 12], dtype=np.int64)
     ranked_idx = np.array([[0, 1, 2], [1, 0, 2], [2, 1, 0]], dtype=np.int64)
