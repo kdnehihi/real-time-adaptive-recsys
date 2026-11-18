@@ -260,7 +260,7 @@ def masked_exact_retrieval(
     batch_size: int,
     blend_weight: float,
     device: torch.device,
-) -> tuple[dict[str, np.ndarray], dict[str, int]]:
+) -> tuple[dict[str, np.ndarray], dict[str, int], np.ndarray]:
     """Apply identical time/seen masks before ranking every retrieval variant."""
     item_tensor = torch.as_tensor(item_embeddings, dtype=torch.float32, device=device)
     eligible_tensor = torch.as_tensor(eligible_from_ms, dtype=torch.int64, device=device)
@@ -269,6 +269,7 @@ def masked_exact_retrieval(
     variants = ("popularity", "v4_static_ablation", "v4_adaptive", "v4_adaptive_popularity")
     ranked_parts: dict[str, list[np.ndarray]] = {name: [] for name in variants}
     diagnostics = {"target_missing_catalog": 0, "target_time_override": 0, "repeat_target_override": 0}
+    full_history_repeat = np.zeros(len(protocol), dtype=bool)
     k = min(top_k, len(item_ids))
 
     for start in range(0, len(protocol), batch_size):
@@ -288,6 +289,7 @@ def masked_exact_retrieval(
                 mask[row_offset, seen_indices] = True
             if int(row.video_id) in seen:
                 diagnostics["repeat_target_override"] += 1
+                full_history_repeat[start + row_offset] = True
             mask[row_offset, target_index] = False
         mask_tensor = torch.as_tensor(mask, dtype=torch.bool, device=device)
 
@@ -308,7 +310,7 @@ def masked_exact_retrieval(
             torch.cuda.empty_cache()
         if end % (batch_size * 20) == 0 or end == len(protocol):
             print(f"retrieved queries: {end}/{len(protocol)}", flush=True)
-    return {name: np.vstack(parts) for name, parts in ranked_parts.items()}, diagnostics
+    return {name: np.vstack(parts) for name, parts in ranked_parts.items()}, diagnostics, full_history_repeat
 
 
 def per_query_metrics(ranked_ids: np.ndarray, protocol: pd.DataFrame, top_ks: tuple[int, ...]) -> pd.DataFrame:
@@ -324,7 +326,7 @@ def per_query_metrics(ranked_ids: np.ndarray, protocol: pd.DataFrame, top_ks: tu
             "user_id": int(query["user_id"]),
             "target_video_id": target,
             "target_warm": bool(query["target_warm"]),
-            "target_repeated": bool(query["target_repeated_in_recent_history"]),
+            "target_repeated": bool(query["target_repeated_full_history"]),
             "timeline_bucket": query["timeline_bucket"],
             "session_history_bucket": query["session_history_bucket_v2"],
             "exact_rank": np.nan if rank is None else rank,
@@ -443,7 +445,7 @@ def main() -> None:
         set(protocol["user_id"].astype("int64")),
         int(protocol["query_time_ms"].max()) + 1,
     )
-    ranked, diagnostics = masked_exact_retrieval(
+    ranked, diagnostics, full_history_repeat = masked_exact_retrieval(
         adaptive_users,
         static_users,
         item_embeddings,
@@ -457,6 +459,8 @@ def main() -> None:
         args.popularity_blend_weight,
         device,
     )
+    protocol = protocol.copy()
+    protocol["target_repeated_full_history"] = full_history_repeat
 
     metrics = metric_columns(top_ks)
     summaries: list[dict[str, object]] = []

@@ -37,6 +37,7 @@ def test_exact_metrics_use_only_current_target():
             "video_id": [10, 20],
             "target_warm": [True, False],
             "target_repeated_in_recent_history": [False, True],
+            "target_repeated_full_history": [False, True],
             "timeline_bucket": ["early", "late"],
             "session_history_bucket_v2": ["short_1_2", "long_6_10"],
         }
@@ -110,7 +111,7 @@ def test_masking_excludes_future_and_seen_items_but_restores_repeat_target():
     )
     # Item 10 is seen, item 30 is not available yet, and repeated target 20 is restored.
     history = {1: (np.array([50, 60]), np.array([10, 20]))}
-    ranked, diagnostics = masked_exact_retrieval(
+    ranked, diagnostics, repeat_flags = masked_exact_retrieval(
         users,
         users,
         item_embeddings,
@@ -126,3 +127,4 @@ def test_masking_excludes_future_and_seen_items_but_restores_repeat_target():
     )
     assert all(values[0, 0] == 20 for values in ranked.values())
     assert diagnostics["repeat_target_override"] == 1
+    assert repeat_flags.tolist() == [True]

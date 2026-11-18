@@ -28,6 +28,7 @@ The earlier V1 and V2 training notebooks were removed after V3 became the select
 5. `20_colab_adaptive_retrieval_evaluation_audit.ipynb` - audit controlled Top-1000 candidate coverage, bootstrap uncertainty, and cold/warm plus history-length segments before introducing a stronger retrieval algorithm.
 6. `21_colab_build_adaptive_eval_protocol_v2.ipynb` - materialize the corrected multi-query exact-target evaluation protocol before re-evaluating retrieval models.
 7. `22_colab_evaluate_adaptive_protocol_v2.ipynb` - evaluate Popularity, a controlled static V4 ablation, and adaptive V4 under the same time-eligible, seen-filtered exact-target protocol.
+8. `23_colab_adaptive_content_readiness_audit.ipynb` - audit author/content coverage and metadata collisions before training the next cold-aware retrieval model.
 
 The pointwise V5, standalone V6, and checkpoint-only combined notebooks were removed because notebooks 18 and 19 replace those workflows.
 
@@ -39,4 +40,5 @@ The pointwise V5, standalone V6, and checkpoint-only combined notebooks were rem
 - V5 v2 is retained as an experiment but is rejected for serving because controlled same-candidate validation is below V4.
 - Notebook 20 exposed temporal contamination in the historical multi-positive relevance definition.
 - Notebook 21 builds the corrected point-in-time query set; notebook 22 is the active A2 evaluation step.
+- A2 confirms that adaptive sequence modeling helps, but cold-item coverage remains the retrieval bottleneck; notebook 23 is the active A3 input-readiness step.
 - The adaptive test split must be rebuilt before final locked test reporting.

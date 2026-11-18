@@ -146,3 +146,38 @@ sequence value because it holds model weights and long-term state constant.
 The historical V3 checkpoint remains a reference and can be added to the same
 protocol once its inference artifact is available in the shared artifact
 store.
+
+### Step A2 result
+
+The corrected protocol evaluated 11,758 queries from 984 users against 854,893
+time-eligible candidates. V4 adaptive improved exact HR@1000 from 1.482% for
+the controlled static ablation to 2.356%. The paired user-bootstrap delta was
+0.874 percentage points with a 95% interval of `[0.620, 1.137]`, confirming
+that recent-sequence modeling adds useful retrieval signal.
+
+The remaining bottleneck is cold retrieval:
+
+- V4 adaptive warm-target HR@1000: 5.174%;
+- V4 adaptive cold-target HR@1000: 0.367%;
+- cold targets account for 61.1% of protocol queries.
+
+The global popularity blend reached 2.500% overall HR@1000, but reduced cold
+HR@1000 to 0.090%. Its paired improvement over raw V4 was not conclusive, so it
+is not the serving default. A second-stage ranker remains blocked until target
+coverage in the retrieval candidate set improves.
+
+### Step A3 implementation
+
+`23_colab_adaptive_content_readiness_audit.ipynb` and
+`scripts/audit_adaptive_content_readiness.py` inspect the item inputs needed to
+fix cold retrieval before another expensive training run. The audit measures:
+
+- missingness and cardinality of the current static item fields;
+- content-signature collision sizes with and without `author_id`;
+- the share of cold targets whose author is known from train;
+- strict point-in-time target-author exposure in each user's prior history;
+- semantic fields still absent from Gold, including tag, text, audio, and
+  visual embeddings.
+
+This step is CPU-only. Its output decides whether an author-aware branch is
+already viable or whether richer content features must be materialized first.
