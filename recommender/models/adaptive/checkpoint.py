@@ -3,12 +3,14 @@ from __future__ import annotations
 import json
 import math
 import gc
+import time
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
 
 import numpy as np
 import pandas as pd
+import pyarrow as pa
 import pyarrow.dataset as ds
 import pyarrow.parquet as pq
 import torch
@@ -131,12 +133,48 @@ def read_parquet(
 ) -> pd.DataFrame:
     """Read a bounded Parquet slice into pandas for checkpoint evaluation."""
     files = [str(p) for p in parquet_files(path)]
-    dataset = ds.dataset(files, format="parquet")
     cols = list(columns) if columns is not None else None
-    if limit is not None:
-        table = dataset.head(limit, columns=cols, filter=filter_expr)
-    else:
-        table = dataset.to_table(columns=cols, filter=filter_expr)
+    try:
+        dataset = ds.dataset(files, format="parquet")
+        if limit is not None:
+            table = dataset.head(limit, columns=cols, filter=filter_expr)
+        else:
+            table = dataset.to_table(columns=cols, filter=filter_expr)
+    except OSError as exc:
+        # Google Drive FUSE can fail when Arrow stats/opens many shards at once.
+        # Retry one shard at a time so each dataset and file handle is released
+        # before the next remote file is touched.
+        print(f"multi-shard Arrow read failed ({exc}); falling back to sequential reads", flush=True)
+        tables: list[pa.Table] = []
+        remaining = limit
+        for index, file_name in enumerate(files, start=1):
+            for attempt in range(1, 6):
+                try:
+                    shard = ds.dataset([file_name], format="parquet")
+                    if remaining is None:
+                        part = shard.to_table(columns=cols, filter=filter_expr)
+                    else:
+                        part = shard.head(remaining, columns=cols, filter=filter_expr)
+                    break
+                except OSError:
+                    if attempt == 5:
+                        raise
+                    time.sleep(min(2 ** (attempt - 1), 8))
+            if len(part):
+                tables.append(part)
+                if remaining is not None:
+                    remaining -= len(part)
+                    if remaining <= 0:
+                        break
+            del shard
+            if index % 24 == 0:
+                gc.collect()
+        if tables:
+            table = pa.concat_tables(tables, promote_options="default")
+        else:
+            schema = ds.dataset([files[0]], format="parquet").schema
+            selected_schema = schema if cols is None else pa.schema([schema.field(name) for name in cols])
+            table = pa.Table.from_batches([], schema=selected_schema)
     frame = table.to_pandas()
     return frame
 

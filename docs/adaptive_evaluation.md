@@ -120,3 +120,29 @@ reusable Drive artifact. The builder selects up to 12 deterministic queries per
 user, prioritizes history and early/middle/late timeline strata, labels
 warm/cold and recent-repeat targets, sanitizes sequence timestamps, and stores
 exact-target relevance metadata. It does not train or evaluate a model.
+
+The raw session sequence is capped at ten events. Downstream evaluation uses
+the explicit buckets `empty`, `short_1_2`, `medium_3_5`, and `long_6_10` rather
+than treating the capped length as a user's total lifetime history.
+
+### Step A2 implementation
+
+`22_colab_evaluate_adaptive_protocol_v2.ipynb` and
+`scripts/evaluate_adaptive_protocol_v2.py` perform the first corrected
+retrieval comparison. They use:
+
+- the fixed A1 query IDs and exact current target;
+- candidate upload-time eligibility at each query;
+- dynamic item statistics frozen at the train cutoff, with zero history for
+  cold items;
+- all strict-prior train and validation events for seen-item filtering;
+- an exception that keeps an intentionally repeated exact target eligible;
+- user-clustered bootstrap confidence intervals;
+- Popularity, V4 with its recent sequence removed, raw adaptive V4, and the
+  existing V4 popularity blend under identical masks.
+
+The static V4 ablation is the primary controlled measurement of short-term
+sequence value because it holds model weights and long-term state constant.
+The historical V3 checkpoint remains a reference and can be added to the same
+protocol once its inference artifact is available in the shared artifact
+store.
