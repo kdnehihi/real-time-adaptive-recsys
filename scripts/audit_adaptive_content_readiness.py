@@ -169,6 +169,22 @@ def quantiles(value: pd.Series) -> dict[str, float]:
     }
 
 
+def build_feature_quality(candidates: pd.DataFrame, audit: pd.DataFrame) -> pd.DataFrame:
+    """Summarize candidate and target fields after the target ID rename."""
+    rows: list[dict[str, object]] = []
+    for column in STATIC_COLUMNS:
+        target_column = "target_video_id" if column == "video_id" else column
+        rows.append(
+            {
+                "feature": column,
+                "candidate_missing_rate": float(candidates[column].isna().mean()),
+                "candidate_cardinality": int(candidates[column].nunique(dropna=True)),
+                "target_missing_rate": float(audit[target_column].isna().mean()),
+            }
+        )
+    return pd.DataFrame(rows)
+
+
 def main() -> None:
     args = parse_args()
     args.output_dir.mkdir(parents=True, exist_ok=True)
@@ -209,17 +225,7 @@ def main() -> None:
     audit["target_author_warm"] = audit["target_author_id"].isin(warm_authors)
     audit.to_parquet(args.output_dir / "per_query_content_readiness.parquet", index=False)
 
-    feature_rows: list[dict[str, object]] = []
-    for column in STATIC_COLUMNS:
-        feature_rows.append(
-            {
-                "feature": column,
-                "candidate_missing_rate": float(candidates[column].isna().mean()),
-                "candidate_cardinality": int(candidates[column].nunique(dropna=True)),
-                "target_missing_rate": float(audit[column].isna().mean()),
-            }
-        )
-    pd.DataFrame(feature_rows).to_csv(args.output_dir / "feature_quality.csv", index=False)
+    build_feature_quality(candidates, audit).to_csv(args.output_dir / "feature_quality.csv", index=False)
 
     cold = audit[~audit["target_warm"]]
     warm = audit[audit["target_warm"]]
