@@ -1,8 +1,10 @@
 from __future__ import annotations
 
 import argparse
+import gc
 import json
 import sys
+import time
 from pathlib import Path
 
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
@@ -12,9 +14,11 @@ if str(PROJECT_ROOT) not in sys.path:
 import numpy as np
 import pandas as pd
 import pyarrow.dataset as ds
+import pyarrow.parquet as pq
 
 from recommender.models.adaptive.checkpoint import (
     as_sequence,
+    parquet_files,
     read_parquet,
     sanitize_point_in_time_sequences,
     save_json,
@@ -23,6 +27,43 @@ from recommender.models.adaptive.checkpoint import (
 
 HISTORY_BUCKET_ORDER = ["empty", "short_1_4", "medium_5_19", "long_20_plus"]
 TIMELINE_BUCKET_ORDER = ["early", "middle", "late"]
+
+
+def load_distinct_int64_column_sharded(
+    path: Path,
+    column: str,
+    retries: int = 5,
+) -> set[int]:
+    """Read one column shard-by-shard to avoid exhausting Drive FUSE handles."""
+    files = parquet_files(path)
+    values: set[int] = set()
+    for index, file_path in enumerate(files, start=1):
+        for attempt in range(1, retries + 1):
+            try:
+                # A Python file context guarantees each remote FUSE handle closes
+                # before the next shard is opened. Dataset.to_table may hold many
+                # Drive files open concurrently and fail with transient stat errors.
+                with file_path.open("rb") as stream:
+                    table = pq.ParquetFile(stream).read(columns=[column], use_threads=False)
+                shard_values = table.column(column).to_pandas().dropna().astype("int64").unique()
+                values.update(int(value) for value in shard_values)
+                del shard_values, table
+                break
+            except (OSError, IOError) as exc:
+                gc.collect()
+                if attempt == retries:
+                    raise OSError(
+                        f"Failed reading {column} from shard {file_path.name} after {retries} attempts"
+                    ) from exc
+                delay = min(2**(attempt - 1), 8)
+                print(
+                    f"Drive read retry {attempt}/{retries} for {file_path.name}; sleeping {delay}s",
+                    flush=True,
+                )
+                time.sleep(delay)
+        if index % 16 == 0 or index == len(files):
+            print(f"train item shards: {index}/{len(files)}; distinct items: {len(values):,}", flush=True)
+    return values
 
 
 def parse_args() -> argparse.Namespace:
@@ -185,9 +226,7 @@ def main() -> None:
         raise RuntimeError("Some selected query histories were not loaded.")
 
     print("loading train item IDs for warm/cold labels...", flush=True)
-    train_items = set(
-        read_parquet(train_source, ["video_id"])["video_id"].dropna().astype("int64").unique().tolist()
-    )
+    train_items = load_distinct_int64_column_sharded(train_source, "video_id")
     selected["target_warm"] = selected["video_id"].astype("int64").isin(train_items)
     selected["target_repeated_in_recent_history"] = [
         int(target) in set(int(value) for value in as_sequence(seen) if value is not None)

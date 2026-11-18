@@ -3,6 +3,7 @@ import pandas as pd
 from scripts.build_adaptive_eval_protocol_v2 import (
     build_index,
     history_bucket,
+    load_distinct_int64_column_sharded,
     select_user_queries,
 )
 
@@ -70,3 +71,10 @@ def test_selection_uses_session_history_not_capped_global_sequence_length():
         "medium_5_19",
         "long_20_plus",
     }
+
+
+def test_distinct_ids_are_loaded_across_independent_parquet_shards(tmp_path):
+    pd.DataFrame({"video_id": [1, 2, 2, None]}).to_parquet(tmp_path / "part-00000.parquet", index=False)
+    pd.DataFrame({"video_id": [2, 3, 4]}).to_parquet(tmp_path / "part-00001.parquet", index=False)
+
+    assert load_distinct_int64_column_sharded(tmp_path, "video_id") == {1, 2, 3, 4}
