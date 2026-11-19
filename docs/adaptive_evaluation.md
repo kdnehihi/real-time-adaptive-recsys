@@ -181,3 +181,27 @@ fix cold retrieval before another expensive training run. The audit measures:
 
 This step is CPU-only. Its output decides whether an author-aware branch is
 already viable or whether richer content features must be materialized first.
+
+### Step A3 result and V4.1
+
+Author identity is available for every protocol target. Among cold targets,
+80.88% belong to an author observed in train and 44.53% have a strict-prior
+interaction from the same user with that author. Adding author identity to the
+basic metadata signature reduces median cold-target collision size from 16,522
+videos to 2. Basic metadata alone is therefore insufficient, while an author
+branch is justified.
+
+`24_colab_v4_1_author_retrieval.ipynb` trains V4.1 as an ANN-compatible
+residual over frozen V4:
+
+- a train-only shared author embedding with OOV index zero;
+- recent video IDs mapped to strict-prior author IDs;
+- recency-weighted author preference pooling;
+- a learned history-count gate and residual scale;
+- concatenated V4/author user and item vectors whose dot product equals the
+  sum of the V4 and author scores.
+
+The full V4 model stays frozen for the first controlled experiment. Training
+checkpoints are written after every epoch and can resume after a Colab runtime
+failure. The final evaluator reuses the exact A2 eligibility, seen filtering,
+warm/cold segmentation, and clustered user bootstrap.
