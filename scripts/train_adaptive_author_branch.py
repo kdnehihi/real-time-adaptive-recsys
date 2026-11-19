@@ -195,7 +195,11 @@ def main() -> None:
     branch = AuthorResidualRetrieval(author_vocab.size, cfg.embedding_dim, cfg.dropout).to(device)
     optimizer = torch.optim.AdamW(branch.parameters(), lr=cfg.learning_rate, weight_decay=cfg.weight_decay)
     loss_fn = nn.CrossEntropyLoss()
+    history_path = args.output_dir / "training_history.csv"
     history: list[dict[str, float | int]] = []
+    if args.resume and history_path.exists():
+        previous = pd.read_csv(history_path)
+        history = previous.to_dict(orient="records")
     start_epoch, best_metric, bad_epochs = 1, -1.0, 0
     last_path = args.output_dir / "last_checkpoint.pt"
     if args.resume and last_path.exists():
@@ -207,6 +211,13 @@ def main() -> None:
         start_epoch = int(checkpoint["epoch"]) + 1
         best_metric = float(checkpoint.get("best_metric", -1.0))
         print("resuming at epoch", start_epoch, flush=True)
+        if start_epoch > cfg.epochs and (args.output_dir / "best_model.pt").exists():
+            print(
+                f"training already complete at epoch {start_epoch - 1}; "
+                "keeping existing checkpoints and reports",
+                flush=True,
+            )
+            return
 
     for epoch in range(start_epoch, cfg.epochs + 1):
         branch.train()
@@ -273,7 +284,7 @@ def main() -> None:
             print("early stopping", flush=True)
             break
 
-    pd.DataFrame(history).to_csv(args.output_dir / "training_history.csv", index=False)
+    pd.DataFrame(history).to_csv(history_path, index=False)
     save_json(args.output_dir / "config.json", asdict(cfg))
     save_json(
         args.output_dir / "metrics.json",
