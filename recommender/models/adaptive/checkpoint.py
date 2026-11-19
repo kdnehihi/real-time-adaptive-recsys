@@ -557,7 +557,10 @@ def load_artifacts(
 ) -> LoadedAdaptiveArtifacts:
     """Load V4/V5 checkpoints plus the train-fitted preprocessing objects."""
     device = device or select_device()
-    v4_ckpt = torch.load(v4_dir / "best_model.pt", map_location="cpu")
+    # These checkpoints are produced by this project's own training pipeline and
+    # contain configuration metadata in addition to tensors. PyTorch 2.6+
+    # defaults to weights_only=True, which rejects that trusted metadata.
+    v4_ckpt = torch.load(v4_dir / "best_model.pt", map_location="cpu", weights_only=False)
     v4_cfg = v4_ckpt["config"]
     train_for_vocab = prepare_train_vocab_frame(adaptive_root, train_vocab_limit or v4_cfg.get("max_train_examples"))
     item_pool = prepare_train_item_vocab_frame(adaptive_root, item_pool_limit or v4_cfg.get("max_item_pool_examples"))
@@ -574,7 +577,7 @@ def load_artifacts(
     v5 = None
     v5_cfg = None
     if v5_dir is not None and (v5_dir / "best_model.pt").exists():
-        v5_ckpt = torch.load(v5_dir / "best_model.pt", map_location="cpu")
+        v5_ckpt = torch.load(v5_dir / "best_model.pt", map_location="cpu", weights_only=False)
         v5_cfg = v5_ckpt["config"]
         ranker_class = V5ResidualRanker if v5_cfg.get("model_type") == "residual_listwise_v2" else V5Ranker
         v5 = ranker_class(int(v4_cfg["retrieval_dim"]), tuple(v5_cfg["hidden_dims"]), float(v5_cfg["dropout"]))

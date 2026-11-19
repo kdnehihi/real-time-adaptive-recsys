@@ -199,7 +199,9 @@ def main() -> None:
     start_epoch, best_metric, bad_epochs = 1, -1.0, 0
     last_path = args.output_dir / "last_checkpoint.pt"
     if args.resume and last_path.exists():
-        checkpoint = torch.load(last_path, map_location=device)
+        # The resume checkpoint is created by this script and includes optimizer
+        # and NumPy-backed metadata, so request the trusted full checkpoint.
+        checkpoint = torch.load(last_path, map_location=device, weights_only=False)
         branch.load_state_dict(checkpoint["model_state_dict"])
         optimizer.load_state_dict(checkpoint["optimizer_state_dict"])
         start_epoch = int(checkpoint["epoch"]) + 1
