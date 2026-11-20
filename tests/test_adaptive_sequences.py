@@ -1,3 +1,5 @@
+from argparse import Namespace
+
 import pandas as pd
 from pyspark.sql import functions as F
 
@@ -9,6 +11,12 @@ from scripts.audit_corrected_adaptive_sequences import (
     install_worker_runtime,
     legacy_delta,
     read_protocol_index,
+)
+from scripts.build_corrected_adaptive_sequence_delta import (
+    build_delta,
+    example_id_expression,
+    materialize_contexts,
+    quality_report,
 )
 
 
@@ -140,3 +148,31 @@ def test_worker_runtime_zip_is_added_to_python_workers(spark, tmp_path):
     visible, class_name = spark.sparkContext.parallelize([1], 1).map(inspect_worker).first()
     assert visible is True
     assert class_name == "OnlineUserStateReducer"
+
+
+def test_corrected_delta_has_full_key_coverage_and_strict_prior_arrays(spark, tmp_path):
+    history = spark.createDataFrame(
+        [
+            make_event(1, 1000, 10),
+            make_event(2, 2000, 20),
+            make_event(3, 2000, 30),
+            make_event(4, 3000, 40),
+        ]
+    )
+    keyed = history.withColumn("example_id", example_id_expression())
+    keys = keyed.select("example_id", "user_id").withColumn("split", F.lit("train"))
+    args = Namespace(
+        work_dir=tmp_path / "work",
+        overwrite=True,
+        rebuild_contexts=False,
+        max_sequence_len=30,
+        max_session_sequence_len=10,
+    )
+    global_context, session_context = materialize_contexts(args, history)
+    delta = build_delta(keys, history, global_context, session_context)
+    report = quality_report(delta, keys, args)
+
+    assert report["passed"] is True
+    assert report["rows"] == 4
+    at_2000 = delta.where("current_time_ms = 2000").select("recent_video_ids").first()[0]
+    assert at_2000 == [10]

@@ -356,3 +356,29 @@ latest 30 global and 10 session events. An independent grouped event reducer
 reconstructs the same A2 query states. Full Gold materialization and V4
 retraining are blocked until those two implementations reach exact core
 parity.
+
+### Corrected sequence contract accepted
+
+Notebook 28 passed the corrected data-contract gate with exact parity for all
+18 audited sequence fields across 7,655 queries from 642 users. The audit
+replayed 6,676,246 canonical train/validation events and found no mismatches
+between the Spark timestamp-batch builder and the independent event reducer.
+This result accepts the corrected builder implementation; it does not make the
+legacy snapshots correct or make old V4 checkpoints compatible with corrected
+input sequences.
+
+`29_colab_build_corrected_sequence_delta.ipynb` is the next data step. It
+rebuilds only the corrected global/session sequence columns for the existing
+train and validation examples, preserving `example_id` as the join key. The
+output is a compact versioned delta rather than another complete copy of Gold.
+Its acceptance gates require complete key coverage, aligned sequence arrays,
+strictly prior timestamps, and the configured 30-event global and 10-event
+session limits.
+
+The notebook keeps Spark work and intermediate contexts on Colab local disk,
+uploads the large final delta to the private Hugging Face artifact repository
+at `corrected_sequences/v2/`, and writes only a small manifest/location record
+to Drive. V4 retraining should start only after this manifest reports all
+quality gates as passed. Old V4/V4.2 metrics remain historical legacy-contract
+results and must not be directly compared with a corrected-contract model
+until both are evaluated under one locked protocol.
