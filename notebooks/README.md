@@ -47,4 +47,5 @@ The pointwise V5, standalone V6, and checkpoint-only combined notebooks were rem
 - A3 confirms that author identity is the strongest available cold-start signal, but V4.1's sparse learned author embeddings do not produce a statistically reliable gain and are rejected.
 - Notebook 25 selected V4.2 with author weight `0.2`, popularity weight `0.02`, and recency tau `3.0`; it passes the paired holdout HR@1000 acceptance gate and is the current adaptive retrieval choice.
 - Notebook 26 is the active production-style replay step. It fixes V4.2 parameters, enforces strict-prior state, reports preference-shift/warm-cold/history segments, and records exact-matrix throughput separately from future ANN latency.
+- Notebook 26 confirms both adaptation stages on holdout: V4 adaptive beats the static ablation and V4.2 beats the same-popularity V4 with positive paired HR@1000 confidence intervals. It remains a point-in-time snapshot replay; an event-mutating online state engine is the next serving milestone.
 - The adaptive test split must be rebuilt before final locked test reporting.

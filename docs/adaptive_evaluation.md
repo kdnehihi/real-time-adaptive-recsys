@@ -267,3 +267,33 @@ No V3 inference checkpoint exists in the shared artifact repository, so the
 replay records V3 as unavailable instead of mixing historical metrics from a
 different protocol. V3 can be added later only after a compatible inference
 artifact is exported and evaluated against the same A2 query/candidate set.
+
+### V6 replay result
+
+The replay validated 325,710 recent-event timestamps across 11,758 protocol
+queries with zero point-in-time violations, then reported the untouched V4.2
+holdout of 7,655 queries from 642 users.
+
+| Replay variant | HR@10 | HR@100 | HR@1000 | NDCG@1000 |
+| --- | ---: | ---: | ---: | ---: |
+| V4 static ablation | 0.0130% | 0.2077% | 1.4278% | 0.00189 |
+| V4 adaptive | 0.0649% | 0.3245% | 2.3650% | 0.00319 |
+| V4 adaptive + popularity | 0.0779% | 0.4803% | 2.4039% | 0.00350 |
+| **V4.2 author affinity** | **0.1298%** | **0.5582%** | **2.5337%** | **0.00411** |
+
+Adaptive V4 improves HR@1000 over its static ablation by 0.937 percentage
+points with paired CI95 `[0.623, 1.251]`. V4.2 then improves HR@1000 over V4
+with the same popularity bias by 0.130 points with CI95 `[0.052, 0.221]` and
+improves NDCG@1000 by 0.000617 with a fully positive interval. The
+recent-preference-shift segment also improves directionally at HR@1000.
+
+The exact-matrix benchmark processed 57.3 query-variant evaluations per
+second after item/user encoding; total notebook runtime was 9.8 minutes. This
+is an offline throughput measurement, not per-request production latency.
+
+This experiment is accurately described as timestamp-ordered point-in-time
+snapshot replay. Gold supplies each strict-prior state snapshot; the replay
+does not yet consume every event and mutate an online state store itself. A
+true serving simulation still needs an event-by-event state reducer, state
+parity checks against Gold snapshots, ANN/multi-source candidate retrieval,
+and request-level latency measurement.
