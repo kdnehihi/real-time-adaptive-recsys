@@ -6,6 +6,7 @@ from scripts.audit_corrected_adaptive_sequences import (
     compare_contexts,
     corrected_batch_queries,
     corrected_replay_queries,
+    install_worker_runtime,
     legacy_delta,
     read_protocol_index,
 )
@@ -125,3 +126,17 @@ def test_pandas_protocol_loader_hides_nanosecond_timestamp_from_spark(spark, tmp
         "video_id": 99,
         "query_time_ms": 1_650_000_000_123,
     }
+
+
+def test_worker_runtime_zip_is_added_to_python_workers(spark, tmp_path):
+    runtime = install_worker_runtime(spark, tmp_path / "worker-runtime.zip")
+
+    def inspect_worker(_: int) -> tuple[bool, str]:
+        import sys
+        from recommender.models.adaptive.online_state import OnlineUserStateReducer
+
+        return any(runtime.name in entry for entry in sys.path), OnlineUserStateReducer.__name__
+
+    visible, class_name = spark.sparkContext.parallelize([1], 1).map(inspect_worker).first()
+    assert visible is True
+    assert class_name == "OnlineUserStateReducer"

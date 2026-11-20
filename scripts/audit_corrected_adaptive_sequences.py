@@ -6,12 +6,16 @@ import os
 import shutil
 import sys
 import time
+import zipfile
 from pathlib import Path
 from typing import Any
 
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
 if str(PROJECT_ROOT) not in sys.path:
     sys.path.insert(0, str(PROJECT_ROOT))
+os.environ["PYTHONPATH"] = os.pathsep.join(
+    [str(PROJECT_ROOT), *([os.environ["PYTHONPATH"]] if os.environ.get("PYTHONPATH") else [])]
+)
 
 import numpy as np
 import pandas as pd
@@ -67,6 +71,23 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--max-users", type=int, default=0)
     parser.add_argument("--shuffle-partitions", type=int, default=32)
     return parser.parse_args()
+
+
+def install_worker_runtime(spark: Any, destination: Path) -> Path:
+    """Ship the local recommender package to every Spark Python worker.
+
+    Adding the project root to the driver ``sys.path`` is insufficient for
+    grouped pandas workers, which start separate interpreters. A small zip in
+    Spark's distributed Python path makes imported reducer classes available
+    in local Colab and in future multi-node execution.
+    """
+    destination.parent.mkdir(parents=True, exist_ok=True)
+    with zipfile.ZipFile(destination, "w", compression=zipfile.ZIP_DEFLATED) as archive:
+        for path in sorted((PROJECT_ROOT / "recommender").rglob("*.py")):
+            if "__pycache__" not in path.parts:
+                archive.write(path, path.relative_to(PROJECT_ROOT))
+    spark.sparkContext.addPyFile(str(destination))
+    return destination
 
 
 def holdout_expression(fraction: float, seed: int) -> F.Column:
@@ -363,6 +384,10 @@ def main() -> None:
     spark.sparkContext.setLogLevel("WARN")
     spark.conf.set("spark.sql.shuffle.partitions", str(args.shuffle_partitions))
     spark.conf.set("spark.sql.execution.arrow.maxRecordsPerBatch", "200000")
+    worker_runtime = install_worker_runtime(
+        spark, Path("/tmp/recsys_corrected_sequence_worker_runtime.zip")
+    )
+    print(f"Spark worker runtime: {worker_runtime}", flush=True)
     started = time.perf_counter()
 
     print("loading locked holdout queries...", flush=True)
