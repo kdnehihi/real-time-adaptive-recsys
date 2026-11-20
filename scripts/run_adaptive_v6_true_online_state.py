@@ -81,6 +81,11 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--max-users", type=int, default=0, help="Smoke-test limit; zero means all holdout users.")
     parser.add_argument("--work-dir", type=Path, default=Path("/content/recsys_online_state_work"))
     parser.add_argument("--keep-work-db", action="store_true")
+    parser.add_argument(
+        "--reuse-event-db",
+        action="store_true",
+        help="Reuse a complete local SQLite spool from a prior failed comparison run.",
+    )
     return parser.parse_args()
 
 
@@ -203,6 +208,26 @@ def initialize_event_db(path: Path) -> sqlite3.Connection:
     return connection
 
 
+def open_complete_event_db(path: Path) -> tuple[sqlite3.Connection, int]:
+    """Open a prior spool only when both its event table and ordering index exist."""
+    if not path.exists():
+        raise FileNotFoundError(path)
+    connection = sqlite3.connect(path)
+    objects = dict(
+        connection.execute(
+            "SELECT name, type FROM sqlite_master WHERE name IN ('events', 'event_order')"
+        ).fetchall()
+    )
+    if objects.get("events") != "table" or objects.get("event_order") != "index":
+        connection.close()
+        raise RuntimeError(f"Event spool is incomplete and cannot be resumed: {path}")
+    count = int(connection.execute("SELECT COUNT(*) FROM events").fetchone()[0])
+    if count <= 0:
+        connection.close()
+        raise RuntimeError(f"Event spool contains no events: {path}")
+    return connection, count
+
+
 def _safe_number(value: Any, cast: type, default: int | float = 0) -> int | float:
     """Normalize nullable pandas values before inserting them into SQLite."""
     try:
@@ -316,6 +341,8 @@ def values_match(expected: Any, actual: Any) -> bool:
 
     if missing_scalar(expected):
         return missing_scalar(actual)
+    if missing_scalar(actual):
+        return False
     if isinstance(expected, (float, np.floating)) or isinstance(actual, (float, np.floating)):
         return bool(np.isclose(float(expected), float(actual), rtol=1e-6, atol=1e-6))
     return expected == actual
@@ -440,15 +467,28 @@ def main() -> None:
     print(f"parity queries/users: {len(queries):,}/{len(users):,}", flush=True)
 
     db_path = args.work_dir / "selected_events.sqlite"
-    connection = initialize_event_db(db_path)
+    if args.reuse_event_db and db_path.exists():
+        connection, event_count = open_complete_event_db(db_path)
+        spool = {
+            "events_spooled": event_count,
+            "duplicate_event_keys": "not_precomputed; parity detects duplicate-state effects",
+            "tie_breaker_columns": ["restored_from_existing_index"],
+            "resumed": True,
+        }
+        print(f"reusing complete event spool: {db_path} ({event_count:,} rows)", flush=True)
+    else:
+        connection = initialize_event_db(db_path)
+        spool = None
     try:
-        spool = spool_events(
-            connection,
-            args.adaptive_root,
-            args.split,
-            users,
-            int(queries["current_time_ms"].max()),
-        )
+        if spool is None:
+            spool = spool_events(
+                connection,
+                args.adaptive_root,
+                args.split,
+                users,
+                int(queries["current_time_ms"].max()),
+            )
+            spool["resumed"] = False
         replay_started = time.perf_counter()
         parity, per_query, mismatches = replay_and_compare(
             connection,

@@ -81,6 +81,7 @@ def test_value_comparison_handles_arrays_and_float_tolerance():
     assert values_match([1.0, 2.0], [1.0 + 1e-8, 2.0])
     assert not values_match([1, 2], [2, 1])
     assert values_match(float("nan"), None)
+    assert not values_match(1.0, None)
 
 
 def test_strict_prior_sanitation_keeps_aligned_array_positions():
