@@ -1,3 +1,4 @@
+import pandas as pd
 from pyspark.sql import functions as F
 
 from recommender.data.adaptive_sequences import build_strict_prior_sequence_context
@@ -6,6 +7,7 @@ from scripts.audit_corrected_adaptive_sequences import (
     corrected_batch_queries,
     corrected_replay_queries,
     legacy_delta,
+    read_protocol_index,
 )
 
 
@@ -102,3 +104,24 @@ def test_batch_builder_matches_independent_event_reducer(spark):
     delta = legacy_delta(legacy, batch)
     assert delta["recent_count_match_rate"] == 0.0
     assert delta["legacy_is_corrected_suffix_rate"] == 1.0
+
+
+def test_pandas_protocol_loader_hides_nanosecond_timestamp_from_spark(spark, tmp_path):
+    path = tmp_path / "queries.parquet"
+    pd.DataFrame(
+        {
+            "example_id": ["example-1"],
+            "user_id": [7],
+            "video_id": [99],
+            "query_time_ms": [1_650_000_000_123],
+            "as_of_time": [pd.Timestamp("2022-04-15 12:00:00.123456789")],
+        }
+    ).to_parquet(path, index=False)
+
+    loaded = read_protocol_index(spark, path).first().asDict()
+    assert loaded == {
+        "example_id": "example-1",
+        "user_id": 7,
+        "video_id": 99,
+        "query_time_ms": 1_650_000_000_123,
+    }

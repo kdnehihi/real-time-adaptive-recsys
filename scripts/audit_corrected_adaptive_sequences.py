@@ -81,11 +81,35 @@ def holdout_expression(fraction: float, seed: int) -> F.Column:
     return hashed >= F.lit(int(fraction * 1_000_003))
 
 
+def read_protocol_index(spark: Any, path: Path) -> DataFrame:
+    """Read the small pandas-authored protocol without exposing nanosecond timestamps to Spark.
+
+    Spark 4 rejects Parquet ``TIMESTAMP(NANOS)`` while inspecting the file even
+    when that column is not selected. Pandas/Arrow can read it safely; only the
+    four primitive columns needed by this audit are then converted to Spark.
+    """
+    columns = ["example_id", "user_id", "video_id", "query_time_ms"]
+    frame = pd.read_parquet(path, columns=columns)
+    frame = frame.dropna(subset=columns).copy()
+    frame["example_id"] = frame["example_id"].astype(str)
+    for column in ("user_id", "video_id", "query_time_ms"):
+        frame[column] = pd.to_numeric(frame[column], errors="raise").astype("int64")
+    schema = T.StructType(
+        [
+            T.StructField("example_id", T.StringType(), False),
+            T.StructField("user_id", T.LongType(), False),
+            T.StructField("video_id", T.IntegerType(), False),
+            T.StructField("query_time_ms", T.LongType(), False),
+        ]
+    )
+    return spark.createDataFrame(frame, schema=schema)
+
+
 def load_queries(args: argparse.Namespace) -> tuple[DataFrame, DataFrame]:
     """Load locked holdout IDs plus session/legacy state from adaptive Gold."""
     spark = get_spark()
     protocol = (
-        spark.read.parquet(str(args.protocol_dir / "queries.parquet"))
+        read_protocol_index(spark, args.protocol_dir / "queries.parquet")
         .where(holdout_expression(args.calibration_user_fraction, args.seed))
         .select("example_id", "user_id", "video_id", "query_time_ms")
     )
