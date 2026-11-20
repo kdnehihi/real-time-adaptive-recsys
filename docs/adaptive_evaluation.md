@@ -287,9 +287,10 @@ with the same popularity bias by 0.130 points with CI95 `[0.052, 0.221]` and
 improves NDCG@1000 by 0.000617 with a fully positive interval. The
 recent-preference-shift segment also improves directionally at HR@1000.
 
-The exact-matrix benchmark processed 57.3 query-variant evaluations per
-second after item/user encoding; total notebook runtime was 9.8 minutes. This
-is an offline throughput measurement, not per-request production latency.
+The exact-matrix benchmark processed 57.3 replay queries per second while
+computing all four variants after item/user encoding; total notebook runtime
+was 9.8 minutes. This is an offline throughput measurement, not per-request
+production latency.
 
 This experiment is accurately described as timestamp-ordered point-in-time
 snapshot replay. Gold supplies each strict-prior state snapshot; the replay
