@@ -35,6 +35,7 @@ The earlier V1 and V2 training notebooks were removed after V3 became the select
 12. `27_colab_v6_true_online_state_replay.ipynb` - rebuild bounded recent/session state event by event, verify exact parity with locked A2 Gold snapshots, and benchmark the state reducer without rerunning exact retrieval.
 13. `28_colab_corrected_sequence_parity_audit.ipynb` - compare a corrected timestamp-batch sequence builder with an independent event reducer before rebuilding Gold or retraining V4.
 14. `29_colab_build_corrected_sequence_delta.ipynb` - build the accepted corrected train/validation sequence delta, validate full key coverage and strict-prior arrays, then publish the large artifact to private Hugging Face storage.
+15. `30_colab_v4_corrected_retraining.ipynb` - retrain the unchanged V4 architecture on corrected sequences with resumable Hugging Face checkpoints, then compare legacy-input, corrected-input, and corrected-retrained V4 under one locked A2 protocol.
 
 The pointwise V5, standalone V6, and checkpoint-only combined notebooks were removed because notebooks 18 and 19 replace those workflows.
 
@@ -54,4 +55,5 @@ The pointwise V5, standalone V6, and checkpoint-only combined notebooks were rem
 - Notebook 27 is the active online-state milestone. It processes all same-timestamp queries before applying that timestamp's events, uses local disk rather than Drive for its temporary event spool, and treats exact core state parity as a prerequisite for future ANN serving work.
 - Notebook 27 exposed a legacy no-backfill bug: strict online state matched only 21.24% of legacy core snapshots because same-timestamp rows were removed after limiting history.
 - Notebook 28 passed the corrected contract with exact parity on all 18 audited fields across 7,655 queries. Notebook 29 is now the active data step: it materializes a compact corrected sequence delta without retraining a model.
+- Notebook 29 passed all full-data gates for 9,987,780 train/validation examples. Notebook 30 is now the active model step. Corrected V4 is accepted only if its paired user-bootstrap HR@1000 interval is positive against legacy V4 receiving the same corrected inputs; training loss alone is not an acceptance criterion.
 - The adaptive test split must be rebuilt before final locked test reporting.

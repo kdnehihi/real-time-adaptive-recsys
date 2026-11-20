@@ -382,3 +382,35 @@ to Drive. V4 retraining should start only after this manifest reports all
 quality gates as passed. Old V4/V4.2 metrics remain historical legacy-contract
 results and must not be directly compared with a corrected-contract model
 until both are evaluated under one locked protocol.
+
+Notebook 29 completed that materialization for 8,219,912 train and 1,767,868
+validation examples. All 9,987,780 example IDs were unique and covered, and
+the reported alignment, strict-prior timestamp, and sequence-cap violations
+were zero.
+
+### Corrected V4 retraining contract
+
+`30_colab_v4_corrected_retraining.ipynb` keeps the selected V4 Transformer,
+feature encoders, in-batch negatives, popularity-weighted negatives, random
+negatives, and primary optimization settings fixed. Base point-in-time
+features are joined to the corrected sequence delta by `example_id` using an
+out-of-core DuckDB preparation step. This makes legacy V4 to corrected V4 a
+data-contract experiment rather than an architecture change.
+
+Training writes FP16 weight/history checkpoints to private Hugging Face
+storage every two epochs. They intentionally omit AdamW state, which would
+add several GB; a resumed job restores weights and history but restarts the
+optimizer. A real-data smoke run must pass before the full job begins.
+
+The controlled A2 comparison reports:
+
+1. legacy V4 with its legacy sequence input;
+2. legacy V4 with corrected sequence input;
+3. corrected-retrained V4 with corrected sequence input.
+
+Every variant uses identical exact targets, candidate eligibility, seen-item
+masks, popularity weight, and query set. The input-shift delta separates the
+effect of changing sequence values from the retraining delta. Corrected V4 is
+accepted only when the user-clustered paired HR@1000 confidence interval for
+variant 3 versus variant 2 is positive. Train loss and in-batch validation
+metrics are diagnostics and do not replace this retrieval gate.
