@@ -32,6 +32,7 @@ The earlier V1 and V2 training notebooks were removed after V3 became the select
 9. `24_colab_v4_1_author_retrieval.ipynb` - train a resumable author-aware residual branch over frozen V4 and evaluate it on the locked A2 protocol.
 10. `25_colab_v4_2_author_affinity.ipynb` - calibrate a strict-prior recent-author candidate affinity on one user partition and evaluate it on disjoint holdout users.
 11. `26_colab_v6_v4_2_online_replay.ipynb` - replay the selected V4.2 policy in global timestamp order and compare it with controlled static/adaptive V4 variants on the locked holdout.
+12. `27_colab_v6_true_online_state_replay.ipynb` - rebuild bounded recent/session state event by event, verify exact parity with locked A2 Gold snapshots, and benchmark the state reducer without rerunning exact retrieval.
 
 The pointwise V5, standalone V6, and checkpoint-only combined notebooks were removed because notebooks 18 and 19 replace those workflows.
 
@@ -48,4 +49,5 @@ The pointwise V5, standalone V6, and checkpoint-only combined notebooks were rem
 - Notebook 25 selected V4.2 with author weight `0.2`, popularity weight `0.02`, and recency tau `3.0`; it passes the paired holdout HR@1000 acceptance gate and is the current adaptive retrieval choice.
 - Notebook 26 is the active production-style replay step. It fixes V4.2 parameters, enforces strict-prior state, reports preference-shift/warm-cold/history segments, and records exact-matrix throughput separately from future ANN latency.
 - Notebook 26 confirms both adaptation stages on holdout: V4 adaptive beats the static ablation and V4.2 beats the same-popularity V4 with positive paired HR@1000 confidence intervals. It remains a point-in-time snapshot replay; an event-mutating online state engine is the next serving milestone.
+- Notebook 27 is the active online-state milestone. It processes all same-timestamp queries before applying that timestamp's events, uses local disk rather than Drive for its temporary event spool, and treats exact core state parity as a prerequisite for future ANN serving work.
 - The adaptive test split must be rebuilt before final locked test reporting.

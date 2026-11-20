@@ -298,3 +298,32 @@ does not yet consume every event and mutate an online state store itself. A
 true serving simulation still needs an event-by-event state reducer, state
 parity checks against Gold snapshots, ANN/multi-source candidate retrieval,
 and request-level latency measurement.
+
+### True online-state reducer implementation
+
+`27_colab_v6_true_online_state_replay.ipynb`,
+`scripts/run_adaptive_v6_true_online_state.py`, and
+`recommender/models/adaptive/online_state.py` implement the next serving
+milestone without repeating the expensive retrieval benchmark.
+
+The reducer keeps a bounded 30-event user deque and 10-event user/session
+deque. Events are spooled from train and validation to a local SQLite database
+so memory does not grow with full history. Replay uses this exact contract:
+
+1. Order events by event time and the Gold event-ID tie-breaker.
+2. At timestamp `t`, answer every selected query from state containing only
+   events with time `< t`.
+3. Append all events at `t` only after those queries have read state.
+4. Compare rebuilt global/session arrays and counts field by field with the
+   locked A2 Gold snapshots.
+
+Core array/count parity is the acceptance gate. Scalar elapsed-time and rate
+fields are reported as diagnostics because the original Gold builder computed
+some of those scalars before removing ambiguous same-timestamp sequence
+events. Long-term aggregate state remains outside this reducer and needs a
+separate incremental aggregation contract.
+
+Notebook 27 is CPU-only. Its large SQLite spool stays on Colab local disk;
+only a small JSON/CSV report bundle is copied to Drive. Passing parity means
+the online reducer produces the same V4 sequence tensors as the already
+evaluated snapshot replay. It does not by itself measure ANN serving latency.
