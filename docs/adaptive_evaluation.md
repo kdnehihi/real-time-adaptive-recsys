@@ -327,3 +327,32 @@ Notebook 27 is CPU-only. Its large SQLite spool stays on Colab local disk;
 only a small JSON/CSV report bundle is copied to Drive. Passing parity means
 the online reducer produces the same V4 sequence tensors as the already
 evaluated snapshot replay. It does not by itself measure ANN serving latency.
+
+### True online-state parity result and correction
+
+Notebook 27 replayed 6,676,246 canonicalized train/validation rows for 7,655
+holdout queries. The reducer itself sustained about 92,261 state events per
+second, but core parity with legacy Gold was only 21.24%, so the serving gate
+failed.
+
+The dominant cause is the legacy builder's order of operations. It first took
+30 global or 10 session rows using an event-ID order that included other rows
+from the current timestamp, then removed current-timestamp rows without
+backfilling older valid history. In the first 100 mismatch examples, 89 online
+sequences were longer than their legacy counterparts and 76 legacy sequences
+were exact suffixes of the corrected online sequence. Global event-count
+parity was 25.83%; session event-count parity was 49.68%.
+
+This does not invalidate V4.2's locked legacy-snapshot metrics, but it means a
+correct production reducer would feed V4 a different sequence distribution
+than it saw during training. Compatibility with the flawed no-backfill rule is
+not adopted because it depends on arbitrary within-timestamp ordering and
+throws away valid prior events.
+
+`28_colab_corrected_sequence_parity_audit.ipynb` therefore adds a data-only
+gate before rebuilding or retraining. Its Spark builder groups events into
+timestamp batches, removes the complete current batch, and only then keeps the
+latest 30 global and 10 session events. An independent grouped event reducer
+reconstructs the same A2 query states. Full Gold materialization and V4
+retraining are blocked until those two implementations reach exact core
+parity.

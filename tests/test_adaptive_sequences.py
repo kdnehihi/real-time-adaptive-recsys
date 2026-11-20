@@ -1,0 +1,104 @@
+from pyspark.sql import functions as F
+
+from recommender.data.adaptive_sequences import build_strict_prior_sequence_context
+from scripts.audit_corrected_adaptive_sequences import (
+    compare_contexts,
+    corrected_batch_queries,
+    corrected_replay_queries,
+    legacy_delta,
+)
+
+
+def make_event(index: int, time_ms: int, video_id: int, session_id: str = "7_1") -> dict:
+    """Create one compact history event for strict-prior Spark tests."""
+    return {
+        "event_id": f"event-{index:04d}",
+        "user_id": 7,
+        "video_id": video_id,
+        "time_ms": time_ms,
+        "session_id": session_id,
+        "target_class": "STRONG_POSITIVE",
+        "engagement_strength": 1.0,
+        "long_view": 1,
+        "is_like": 0,
+        "is_hate": 0,
+        "is_click": 1,
+    }
+
+
+def test_timestamp_batch_filter_happens_before_sequence_limit(spark):
+    older = [make_event(index, index * 1000, index) for index in range(1, 36)]
+    current_batch = [
+        make_event(100, 100_000, 100),
+        make_event(101, 100_000, 101),
+        make_event(102, 100_000, 102),
+    ]
+    following = [make_event(103, 101_000, 103)]
+    history = spark.createDataFrame(older + current_batch + following)
+
+    global_context, session_context = build_strict_prior_sequence_context(history, 30, 10)
+    at_current = global_context.where("time_ms = 100000").first().asDict()
+    at_following = global_context.where("time_ms = 101000").first().asDict()
+    session_current = session_context.where("time_ms = 100000").first().asDict()
+
+    # Current-time events are excluded before limiting, so older events backfill to 30.
+    assert at_current["recent_video_ids"] == list(range(6, 36))
+    assert at_current["recent_event_count"] == 30
+    assert max(at_current["recent_time_ms"]) < 100_000
+
+    # The next timestamp sees the entire prior timestamp batch in event_id order.
+    assert at_following["recent_video_ids"][-3:] == [100, 101, 102]
+    assert at_following["recent_event_count"] == 30
+
+    # Session state follows the same rule with its independent cap.
+    assert session_current["session_recent_video_ids"] == list(range(26, 36))
+    assert session_current["session_recent_event_count"] == 10
+
+
+def test_same_timestamp_events_have_one_shared_prior_context(spark):
+    rows = [
+        make_event(1, 1000, 10),
+        make_event(2, 2000, 20),
+        make_event(3, 2000, 30),
+    ]
+    history = spark.createDataFrame(rows)
+    global_context, session_context = build_strict_prior_sequence_context(history, 30, 10)
+
+    global_row = global_context.where("time_ms = 2000").first().asDict()
+    session_row = session_context.where("time_ms = 2000").first().asDict()
+    assert global_context.where("time_ms = 2000").count() == 1
+    assert session_context.where("time_ms = 2000").count() == 1
+    assert global_row["recent_video_ids"] == [10]
+    assert session_row["session_recent_video_ids"] == [10]
+
+
+def test_batch_builder_matches_independent_event_reducer(spark):
+    older = [make_event(index, index * 1000, index) for index in range(1, 36)]
+    current = [make_event(100, 100_000, 100), make_event(101, 100_000, 101)]
+    history = spark.createDataFrame(older + current)
+    queries = spark.createDataFrame(
+        [
+            {
+                "example_id": "query-100",
+                "user_id": 7,
+                "video_id": 100,
+                "session_id": "7_1",
+                "current_time_ms": 100_000,
+            }
+        ]
+    )
+
+    batch = corrected_batch_queries(history, queries, 30, 10)
+    replay = corrected_replay_queries(history, queries, 30, 10)
+    compared, report = compare_contexts(batch, replay)
+
+    assert compared.count() == 1
+    assert report["queries_compared"] == 1
+    assert report["accepted"] is True
+
+    legacy = batch.select(
+        "example_id", F.slice("recent_video_ids", -26, 26).alias("recent_video_ids")
+    )
+    delta = legacy_delta(legacy, batch)
+    assert delta["recent_count_match_rate"] == 0.0
+    assert delta["legacy_is_corrected_suffix_rate"] == 1.0
