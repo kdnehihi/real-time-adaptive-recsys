@@ -176,3 +176,23 @@ def test_corrected_delta_has_full_key_coverage_and_strict_prior_arrays(spark, tm
     assert report["rows"] == 4
     at_2000 = delta.where("current_time_ms = 2000").select("recent_video_ids").first()[0]
     assert at_2000 == [10]
+
+
+def test_first_event_elapsed_time_is_null_under_ansi_mode(spark):
+    """Spark 4 ANSI mode must not fail when a prior-event array is empty."""
+    previous = spark.conf.get("spark.sql.ansi.enabled")
+    spark.conf.set("spark.sql.ansi.enabled", "true")
+    try:
+        history = spark.createDataFrame([make_event(1, 1000, 10)])
+        global_context, session_context = build_strict_prior_sequence_context(history)
+        global_row = global_context.select(
+            "recent_event_count", "seconds_since_last_event"
+        ).first()
+        session_row = session_context.select(
+            "session_recent_event_count", "session_seconds_since_last_event"
+        ).first()
+
+        assert global_row == (0, None)
+        assert session_row == (0, None)
+    finally:
+        spark.conf.set("spark.sql.ansi.enabled", previous)

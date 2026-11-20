@@ -88,7 +88,8 @@ def build_strict_prior_global_context(history: DataFrame, maximum_events: int = 
     return (
         context.withColumn(
             "seconds_since_last_event",
-            (F.col("time_ms") - F.element_at("recent_time_ms", -1)) / F.lit(1000.0),
+            (F.col("time_ms") - F.try_element_at("recent_time_ms", F.lit(-1)))
+            / F.lit(1000.0),
         )
         .withColumn(
             "recent_long_view_rate",
@@ -123,7 +124,11 @@ def build_strict_prior_session_context(history: DataFrame, maximum_events: int =
     return (
         context.withColumn(
             "session_seconds_since_last_event",
-            (F.col("time_ms") - F.element_at("session_recent_time_ms", -1)) / F.lit(1000.0),
+            (
+                F.col("time_ms")
+                - F.try_element_at("session_recent_time_ms", F.lit(-1))
+            )
+            / F.lit(1000.0),
         )
         .drop("_event_batch", "_prior_events")
     )
