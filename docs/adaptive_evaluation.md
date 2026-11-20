@@ -249,3 +249,21 @@ authors, followed by the selected score biases. It does not solve semantic
 retrieval for unseen authors: cold HR@1000 remains below raw V4 when compared
 without the popularity control, so richer text/tag/audio/visual item features
 remain the next major retrieval improvement.
+
+### V6 replay implementation
+
+`26_colab_v6_v4_2_online_replay.ipynb` and
+`scripts/run_adaptive_v6_v4_2_replay.py` lock the selected V4.2 weights and
+replay the user-disjoint A2 holdout in global non-decreasing timestamp order.
+Every sequence timestamp is asserted to be strictly earlier than its query.
+The replay compares controlled static V4, adaptive V4, adaptive V4 with the
+selected popularity bias, and V4.2 under identical eligibility and seen-item
+masks. It exports paired user-bootstrap deltas, warm/cold and preference-shift
+segments, large rank-improvement examples, and offline exact-matrix
+throughput. This throughput is diagnostic only and is not presented as ANN
+serving latency.
+
+No V3 inference checkpoint exists in the shared artifact repository, so the
+replay records V3 as unavailable instead of mixing historical metrics from a
+different protocol. V3 can be added later only after a compatible inference
+artifact is exported and evaluated against the same A2 query/candidate set.

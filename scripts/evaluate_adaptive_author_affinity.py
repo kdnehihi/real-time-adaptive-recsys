@@ -154,6 +154,7 @@ def score_configs(
     item_to_index = {int(value): index for index, value in enumerate(item_ids)}
     ranks = {config: np.zeros(len(indices), dtype=np.int64) for config in configs}
     repeat_flags = np.zeros(len(indices), dtype=bool)
+    needs_author_affinity = any(author_weight != 0.0 for author_weight, _ in configs)
     for start in range(0, len(indices), batch_size):
         end = min(start + batch_size, len(indices))
         query_indices = indices[start:end]
@@ -166,13 +167,16 @@ def score_configs(
         target_tensor = torch.as_tensor(targets, dtype=torch.long, device=device)
         users = torch.as_tensor(user_embeddings[query_indices], dtype=torch.float32, device=device)
         base = users @ item_tensor.T
-        affinity = author_affinity_scores(
-            recent_authors[query_indices].to(device), candidate_authors, recency_tau
-        )
+        affinity = None
+        if needs_author_affinity:
+            affinity = author_affinity_scores(
+                recent_authors[query_indices].to(device), candidate_authors, recency_tau
+            )
         for config in configs:
             author_weight, popularity_weight = config
             scores = base
             if author_weight:
+                assert affinity is not None
                 scores = scores + float(author_weight) * affinity
             if popularity_weight:
                 scores = scores + float(popularity_weight) * popularity_tensor
