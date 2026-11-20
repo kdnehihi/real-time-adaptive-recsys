@@ -106,3 +106,50 @@ def encode_author_inputs(
         torch.as_tensor(np.stack(sequence_rows), dtype=torch.long),
         torch.as_tensor(vocabulary.encode(target_authors), dtype=torch.long),
     )
+
+
+def encode_raw_recent_authors(
+    frame: pd.DataFrame,
+    video_to_author: dict[int, int],
+    max_len: int,
+) -> torch.Tensor:
+    """Encode strict-prior creator IDs without a train-vocabulary restriction."""
+    rows: list[np.ndarray] = []
+    for values in frame["recent_video_ids"]:
+        videos = as_sequence(values)[-max_len:]
+        authors = np.asarray(
+            [int(video_to_author.get(int(video), 0) or 0) for video in videos],
+            dtype=np.int64,
+        )
+        padded = np.zeros(max_len, dtype=np.int64)
+        if len(authors):
+            padded[-len(authors) :] = authors
+        rows.append(padded)
+    return torch.as_tensor(np.stack(rows), dtype=torch.long)
+
+
+def author_affinity_scores(
+    recent_author_ids: torch.Tensor,
+    candidate_author_ids: torch.Tensor,
+    recency_tau: float = 3.0,
+) -> torch.Tensor:
+    """Return the strongest recency-weighted exact-author match per candidate."""
+    if recent_author_ids.ndim != 2 or candidate_author_ids.ndim != 1:
+        raise ValueError("Expected recent authors [batch, length] and candidates [items]")
+    batch_size, sequence_length = recent_author_ids.shape
+    scores = torch.zeros(
+        (batch_size, candidate_author_ids.shape[0]),
+        dtype=torch.float32,
+        device=recent_author_ids.device,
+    )
+    if sequence_length == 0:
+        return scores
+    positions = torch.arange(sequence_length, device=recent_author_ids.device, dtype=torch.float32)
+    weights = torch.exp((positions - positions.max()) / max(float(recency_tau), 1e-6))
+    valid_candidates = candidate_author_ids.ne(0)[None, :]
+    for position in range(sequence_length):
+        author = recent_author_ids[:, position]
+        valid = author.ne(0)[:, None] & valid_candidates
+        match = author[:, None].eq(candidate_author_ids[None, :]) & valid
+        scores = torch.maximum(scores, match.to(scores.dtype) * weights[position])
+    return scores

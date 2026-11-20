@@ -30,6 +30,7 @@ The earlier V1 and V2 training notebooks were removed after V3 became the select
 7. `22_colab_evaluate_adaptive_protocol_v2.ipynb` - evaluate Popularity, a controlled static V4 ablation, and adaptive V4 under the same time-eligible, seen-filtered exact-target protocol.
 8. `23_colab_adaptive_content_readiness_audit.ipynb` - audit author/content coverage and metadata collisions before training the next cold-aware retrieval model.
 9. `24_colab_v4_1_author_retrieval.ipynb` - train a resumable author-aware residual branch over frozen V4 and evaluate it on the locked A2 protocol.
+10. `25_colab_v4_2_author_affinity.ipynb` - calibrate a strict-prior recent-author candidate affinity on one user partition and evaluate it on disjoint holdout users.
 
 The pointwise V5, standalone V6, and checkpoint-only combined notebooks were removed because notebooks 18 and 19 replace those workflows.
 
@@ -42,5 +43,6 @@ The pointwise V5, standalone V6, and checkpoint-only combined notebooks were rem
 - Notebook 20 exposed temporal contamination in the historical multi-positive relevance definition.
 - Notebook 21 builds the corrected point-in-time query set; notebook 22 is the active A2 evaluation step.
 - A2 confirms that adaptive sequence modeling helps, but cold-item coverage remains the retrieval bottleneck; notebook 23 is the active A3 input-readiness step.
-- A3 confirms that author identity is the strongest available cold-start signal; notebook 24 is the active V4.1 training and evaluation step.
+- A3 confirms that author identity is the strongest available cold-start signal, but V4.1's sparse learned author embeddings do not produce a statistically reliable gain and are rejected.
+- Notebook 25 is the active V4.2 experiment: a user-disjoint calibration/holdout test of explicit recent-author affinity for cold retrieval.
 - The adaptive test split must be rebuilt before final locked test reporting.

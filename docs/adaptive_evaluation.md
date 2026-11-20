@@ -205,3 +205,22 @@ The full V4 model stays frozen for the first controlled experiment. Training
 checkpoints are written after every epoch and can resume after a Colab runtime
 failure. The final evaluator reuses the exact A2 eligibility, seen filtering,
 warm/cold segmentation, and clustered user bootstrap.
+
+### V4.1 result and V4.2 decision
+
+V4.1 selected epoch 1, after which its internal validation loss rose while
+train loss continued to fall. On A2, the pure author branch tied V4 at HR@10,
+improved HR@50 by only three exact hits, and reduced HR@1000 from 2.356% to
+2.288%. All paired user-bootstrap intervals for V4.1 minus V4 crossed zero.
+The same conclusion holds after controlling for the identical popularity
+blend: author plus popularity reduced HR@1000 by 0.085 percentage points and
+its interval also crossed zero. V4.1 is therefore rejected for serving.
+
+`25_colab_v4_2_author_affinity.ipynb` tests a less sparse cold-start strategy.
+It adds a recency-weighted exact-author affinity between each strict-prior
+sequence and candidate metadata, without learning 1.1 million author
+embeddings. Hyperparameters are selected on a deterministic calibration-user
+partition and reported once on disjoint holdout users. The acceptance gate is
+a positive paired HR@1000 delta whose clustered 95% lower bound is above zero
+against V4 with the same popularity weight. This sparse affinity can later be
+implemented as a recent-author candidate source alongside ANN retrieval.
