@@ -1,0 +1,40 @@
+{
+  "model_version": "v4_2_author_affinity",
+  "base_retrieval": "v4_transformer",
+  "protocol": "adaptive_eval_v2_v4_2_author_affinity",
+  "scoring": {
+    "author_weight": 0.2,
+    "popularity_weight": 0.02,
+    "author_recency_tau": 3.0,
+    "author_affinity": "maximum recency-weighted exact-author match from strict-prior events"
+  },
+  "selection": {
+    "calibration_queries": 4103,
+    "calibration_users": 342,
+    "holdout_queries": 7655,
+    "holdout_users": 642,
+    "candidate_items": 854893,
+    "user_disjoint": true
+  },
+  "holdout": {
+    "hitrate_at_10": 0.0012980271130800247,
+    "hitrate_at_100": 0.005581516306847334,
+    "hitrate_at_1000": 0.02533748745918274,
+    "ndcg_at_1000": 0.004114285266648719
+  },
+  "acceptance": {
+    "accepted": true,
+    "baseline": "v4_transformer_plus_popularity_0.02",
+    "hitrate_at_1000_delta": 0.0012980270376457975,
+    "hitrate_at_1000_delta_ci95": [
+      0.00038940811129373925,
+      0.0022066459639978556
+    ],
+    "ndcg_at_1000_delta": 0.0006167798192242986,
+    "ndcg_at_1000_delta_ci95": [
+      0.0001359791335081365,
+      0.0012073867013834415
+    ]
+  },
+  "serving_note": "Use V4 ANN retrieval plus a recent-author candidate source, then apply the selected author and popularity score biases to the union."
+}

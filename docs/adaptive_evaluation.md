@@ -224,3 +224,28 @@ partition and reported once on disjoint holdout users. The acceptance gate is
 a positive paired HR@1000 delta whose clustered 95% lower bound is above zero
 against V4 with the same popularity weight. This sparse affinity can later be
 implemented as a recent-author candidate source alongside ANN retrieval.
+
+### V4.2 result
+
+V4.2 passed its predeclared acceptance gate on 7,655 holdout queries from 642
+users, disjoint from the 342 calibration users. The selected configuration is
+`author_weight=0.2`, `popularity_weight=0.02`, and `recency_tau=3.0`.
+
+| Holdout variant | HR@10 | HR@100 | HR@1000 | NDCG@1000 |
+| --- | ---: | ---: | ---: | ---: |
+| V4 raw | 0.0649% | 0.3245% | 2.3650% | 0.00319 |
+| V4 + popularity | 0.0779% | 0.4803% | 2.4039% | 0.00350 |
+| **V4.2 author affinity + popularity** | **0.1298%** | **0.5582%** | **2.5337%** | **0.00411** |
+
+Against V4 with the same popularity weight, V4.2 improved HR@1000 by 0.130
+percentage points with paired user-bootstrap CI95 `[0.039, 0.221]` percentage
+points. NDCG@1000 improved by 0.000617 with CI95 `[0.000136, 0.001207]`.
+The gain is strongest for intentionally repeated targets, but cold-target
+HR@1000 also improves significantly relative to the same-popularity baseline.
+
+V4.2 is now the selected adaptive retrieval variant. In production it should
+be implemented as a union of V4 ANN candidates and candidates from recent
+authors, followed by the selected score biases. It does not solve semantic
+retrieval for unseen authors: cold HR@1000 remains below raw V4 when compared
+without the popularity control, so richer text/tag/audio/visual item features
+remain the next major retrieval improvement.

@@ -44,5 +44,5 @@ The pointwise V5, standalone V6, and checkpoint-only combined notebooks were rem
 - Notebook 21 builds the corrected point-in-time query set; notebook 22 is the active A2 evaluation step.
 - A2 confirms that adaptive sequence modeling helps, but cold-item coverage remains the retrieval bottleneck; notebook 23 is the active A3 input-readiness step.
 - A3 confirms that author identity is the strongest available cold-start signal, but V4.1's sparse learned author embeddings do not produce a statistically reliable gain and are rejected.
-- Notebook 25 is the active V4.2 experiment: a user-disjoint calibration/holdout test of explicit recent-author affinity for cold retrieval.
+- Notebook 25 selected V4.2 with author weight `0.2`, popularity weight `0.02`, and recency tau `3.0`; it passes the paired holdout HR@1000 acceptance gate and is the current adaptive retrieval choice.
 - The adaptive test split must be rebuilt before final locked test reporting.
