@@ -6,7 +6,12 @@ import pandas as pd
 import pytest
 import torch
 
-from recommender.models.adaptive.checkpoint import INPUT_COLUMNS
+from recommender.models.adaptive.checkpoint import (
+    INPUT_COLUMNS,
+    ITEM_NUMERIC,
+    USER_NUMERIC,
+    V4TransformerRetrieval,
+)
 from scripts import compare_corrected_adaptive_v4 as comparison
 from scripts import train_corrected_adaptive_v4 as training
 from scripts.train_corrected_adaptive_v4 import checkpoint_payload, prepare_positive_split
@@ -175,3 +180,47 @@ def test_tiny_corrected_v4_training_smoke(monkeypatch, tmp_path):
     assert checkpoint["config"]["data_contract"] == "corrected_adaptive_sequences_v2"
     assert checkpoint["epoch"] == 1
     assert (output / "metrics.json").exists()
+
+
+def test_sequence_encoder_supports_bfloat16_autocast_with_empty_rows():
+    config = {
+        "retrieval_dim": 8,
+        "transformer_dim": 8,
+        "transformer_heads": 2,
+        "transformer_layers": 1,
+        "transformer_dropout": 0.0,
+        "user_hidden_dims": (16,),
+        "item_hidden_dims": (16,),
+        "dropout": 0.0,
+    }
+    sizes = {
+        "user_id": 4,
+        "user_active_degree": 3,
+        "video_id": 20,
+        "video_type": 3,
+        "upload_type": 3,
+        "event_type": 4,
+    }
+    model = V4TransformerRetrieval(sizes, config)
+    batch = {
+        "user_id": torch.tensor([1, 2]),
+        "user_active_degree": torch.tensor([1, 1]),
+        "video_id": torch.tensor([3, 4]),
+        "video_type": torch.tensor([1, 1]),
+        "upload_type": torch.tensor([1, 1]),
+        "user_numeric": torch.zeros(2, len(USER_NUMERIC)),
+        "item_numeric": torch.zeros(2, len(ITEM_NUMERIC)),
+        "seq_video_id": torch.tensor([[0, 0, 0], [0, 5, 6]]),
+        "seq_event_type": torch.tensor([[0, 0, 0], [0, 1, 2]]),
+        "seq_signals": torch.zeros(2, 3, 5),
+        "seq_time_bucket": torch.zeros(2, 3, dtype=torch.long),
+        "seq_padding_mask": torch.tensor([[True, True, True], [True, False, False]]),
+    }
+    with torch.autocast(device_type="cpu", dtype=torch.bfloat16):
+        mixed = model.encode_user(batch)
+        empty = model.encode_user({**batch, "seq_padding_mask": torch.ones(2, 3, dtype=torch.bool)})
+
+    assert mixed.shape == (2, 8)
+    assert empty.shape == (2, 8)
+    assert torch.isfinite(mixed).all()
+    assert torch.isfinite(empty).all()
