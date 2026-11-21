@@ -445,3 +445,27 @@ interval is strictly positive against both the matched-popularity Corrected V4
 and Legacy V4.2, and cold-item HR@1000 does not regress against the matched
 Corrected V4 baseline. This prevents a warm-author gain from hiding a further
 cold-start loss.
+
+Notebook 31 selected author weight `0.2` with popularity weight `0.02`. Against
+the same-popularity Corrected V4, holdout HR@1000 improved by about 6.1% with a
+strictly positive paired confidence interval. Cold HR@1000 also recovered from
+`0.000143` to `0.001886`. Against Legacy V4.2, the point estimate improved by
+about 7.7%, but the paired interval still crossed zero. The corrected author
+policy is therefore retained as the best experimental candidate but is not yet
+the serving default.
+
+### Independent adaptive test rebuild
+
+`32_colab_rebuild_adaptive_test_protocol.ipynb` repairs the incomplete physical
+test split before final evaluation. It reconstructs `sequence_examples/test`
+from the complete Two-Tower test targets, user state, item snapshots, and the
+materialized legacy sequence context. Quality gates require complete example
+coverage, unique keys, complete user/item joins, positive examples, and zero
+same/future sequence timestamps.
+
+The notebook then builds a deterministic exact-target test protocol using the
+same A2 revision as validation. Existing train data is read only to label warm
+and cold targets; it is not copied. Large test artifacts are published under
+`adaptive_test/v1/` in private Hugging Face storage, while Drive receives only
+small manifests and logs. The fixed Notebook 31 weights must remain unchanged
+in the subsequent test evaluation.

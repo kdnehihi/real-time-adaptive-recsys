@@ -37,6 +37,7 @@ The earlier V1 and V2 training notebooks were removed after V3 became the select
 14. `29_colab_build_corrected_sequence_delta.ipynb` - build the accepted corrected train/validation sequence delta, validate full key coverage and strict-prior arrays, then publish the large artifact to private Hugging Face storage.
 15. `30_colab_v4_corrected_retraining.ipynb` - retrain the unchanged V4 architecture on corrected sequences with resumable Hugging Face checkpoints, then compare legacy-input, corrected-input, and corrected-retrained V4 under one locked A2 protocol.
 16. `31_colab_corrected_v4_author_affinity.ipynb` - calibrate strict-prior recent-author affinity over Corrected V4 on user-disjoint calibration users, then compare it with matched Corrected V4 and Legacy V4.2 on holdout users.
+17. `32_colab_rebuild_adaptive_test_protocol.ipynb` - rebuild the incomplete adaptive test split from complete Two-Tower Gold, lock an exact-target test protocol, and publish the large test artifacts directly to private Hugging Face storage.
 
 The pointwise V5, standalone V6, and checkpoint-only combined notebooks were removed because notebooks 18 and 19 replace those workflows.
 
@@ -58,4 +59,5 @@ The pointwise V5, standalone V6, and checkpoint-only combined notebooks were rem
 - Notebook 28 passed the corrected contract with exact parity on all 18 audited fields across 7,655 queries. Notebook 29 is now the active data step: it materializes a compact corrected sequence delta without retraining a model.
 - Notebook 29 passed all full-data gates for 9,987,780 train/validation examples. Notebook 30 is now the active model step. Corrected V4 is accepted only if its paired user-bootstrap HR@1000 interval is positive against legacy V4 receiving the same corrected inputs; training loss alone is not an acceptance criterion.
 - Notebook 30 improved Corrected V4 holdout HR@1000 by about 7.3% and MRR@1000 by about 21.4% over legacy V4 receiving corrected sequences, but the paired HR@1000 interval crossed zero and cold-item HR regressed. Corrected V4 is therefore not promoted by itself. Notebook 31 is the active lightweight recovery experiment: it tunes author/popularity weights on disjoint calibration users and requires both statistically positive holdout gains and cold-item non-regression.
-- The adaptive test split must be rebuilt before final locked test reporting.
+- Notebook 31 selected author weight `0.2` and popularity weight `0.02`. Author affinity significantly improves matched Corrected V4 and restores cold-item retrieval, but the paired HR@1000 interval versus Legacy V4.2 still crosses zero. The branch remains the best experimental candidate rather than the serving default.
+- Notebook 32 is the active data step. It rebuilds the incomplete adaptive test split and locks the independent test protocol before any final promotion decision; no test metric is used to tune weights.

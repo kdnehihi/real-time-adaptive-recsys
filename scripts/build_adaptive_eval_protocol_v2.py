@@ -72,6 +72,12 @@ def parse_args() -> argparse.Namespace:
     )
     parser.add_argument("--adaptive-root", type=Path, required=True)
     parser.add_argument("--output-dir", type=Path, required=True)
+    parser.add_argument(
+        "--train-source",
+        type=Path,
+        default=None,
+        help="Optional existing train sequence directory used only for warm/cold labels.",
+    )
     parser.add_argument("--split", default="validation", choices=["validation", "test"])
     parser.add_argument("--max-queries-per-user", type=int, default=12)
     parser.add_argument("--seed", type=int, default=44)
@@ -175,7 +181,7 @@ def distribution(frame: pd.DataFrame, column: str) -> list[dict[str, object]]:
 def main() -> None:
     args = parse_args()
     source = args.adaptive_root / "sequence_examples" / args.split
-    train_source = args.adaptive_root / "sequence_examples/train"
+    train_source = args.train_source or (args.adaptive_root / "sequence_examples/train")
     if not source.exists() or not train_source.exists():
         raise FileNotFoundError(f"Missing adaptive source: {source} or {train_source}")
     if args.output_dir.exists() and any(args.output_dir.iterdir()) and not args.overwrite:
