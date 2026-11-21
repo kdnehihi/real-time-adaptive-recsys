@@ -10,6 +10,7 @@ from recommender.models.adaptive.author_branch import (
     encode_raw_recent_authors,
 )
 from scripts.evaluate_adaptive_author_affinity import deterministic_user_split, score_configs
+from scripts.evaluate_corrected_v4_author_affinity import acceptance_decision
 
 
 def test_author_vocab_reserves_oov_and_inputs_are_point_ordered():
@@ -80,3 +81,23 @@ def test_author_affinity_improves_exact_rank_without_user_split_leakage():
     split = deterministic_user_split(users, 0.5, seed=44)
     assert split[0] == split[1]
     assert split[2] == split[3]
+
+
+def test_corrected_author_affinity_acceptance_requires_all_three_gates():
+    positive = {
+        "hitrate@1000": {"delta": 0.01, "ci95_low": 0.001, "ci95_high": 0.02}
+    }
+    selected = {"cold": {"hitrate@1000": 0.02}}
+    matched = {"cold": {"hitrate@1000": 0.019}}
+    gates = acceptance_decision(0.1, positive, positive, selected, matched)
+    assert gates == {
+        "author_affinity_gate": True,
+        "legacy_promotion_gate": True,
+        "cold_item_non_regression_gate": True,
+        "accepted": True,
+    }
+
+    cold_regression = {"cold": {"hitrate@1000": 0.018}}
+    rejected = acceptance_decision(0.1, positive, positive, cold_regression, matched)
+    assert rejected["cold_item_non_regression_gate"] is False
+    assert rejected["accepted"] is False

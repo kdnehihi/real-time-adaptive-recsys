@@ -414,3 +414,34 @@ effect of changing sequence values from the retraining delta. Corrected V4 is
 accepted only when the user-clustered paired HR@1000 confidence interval for
 variant 3 versus variant 2 is positive. Train loss and in-batch validation
 metrics are diagnostics and do not replace this retrieval gate.
+
+Notebook 30 selected epoch 3. On the locked A2 comparison, corrected retraining
+improved HR@1000 and MRR@1000 over legacy V4 receiving the same corrected
+sequence input, but the paired HR@1000 interval still crossed zero. The gain
+was concentrated in warm items and long-history users while cold-item HR@1000
+regressed. The checkpoint remains an experimental input to the next controlled
+branch rather than the serving default.
+
+### Corrected V4 author-affinity calibration
+
+`31_colab_corrected_v4_author_affinity.ipynb` evaluates whether the inexpensive
+V4.2 strict-prior author signal complements the corrected checkpoint. It does
+not retrain the Transformer. Users are deterministically separated into a
+calibration partition and a holdout partition, so no user's queries can tune a
+weight and evaluate that same weight. Calibration searches author-affinity and
+popularity weights; the selected pair is then frozen.
+
+The holdout comparison uses one A2 query set, candidate catalog, target,
+time-eligibility mask, and prior-seen mask for all variants. It reports:
+
+1. raw Corrected V4;
+2. Corrected V4 with the selected popularity weight but no author affinity;
+3. Corrected V4 with the selected author and popularity weights;
+4. the historical Legacy V4.2 policy with author `0.2`, popularity `0.02`, and
+   recency tau `3.0`.
+
+The branch is promoted only when its user-clustered paired HR@1000 confidence
+interval is strictly positive against both the matched-popularity Corrected V4
+and Legacy V4.2, and cold-item HR@1000 does not regress against the matched
+Corrected V4 baseline. This prevents a warm-author gain from hiding a further
+cold-start loss.
