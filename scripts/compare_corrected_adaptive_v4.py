@@ -171,6 +171,16 @@ def paired_bootstrap_delta(left: pd.DataFrame, right: pd.DataFrame, metrics, sam
     }
 
 
+def annotate_target_repeats(protocol: pd.DataFrame, history) -> pd.DataFrame:
+    """Add the full strict-prior repeat flag expected by shared metric code."""
+    output = protocol.copy()
+    output["target_repeated_full_history"] = [
+        int(row.video_id) in prior_seen_items(history, int(row.user_id), int(row.query_time_ms))
+        for row in output.itertuples(index=False)
+    ]
+    return output
+
+
 def main() -> None:
     args = parse_args()
     args.output_dir.mkdir(parents=True, exist_ok=True)
@@ -190,11 +200,20 @@ def main() -> None:
         set(protocol["user_id"].astype("int64")),
         int(protocol["query_time_ms"].max()) + 1,
     )
+    protocol = annotate_target_repeats(protocol, history)
     all_ranked: dict[str, np.ndarray] = {}
+    cache_dir = args.output_dir / "ranked_cache"
+    cache_dir.mkdir(parents=True, exist_ok=True)
     for model_name, model_dir, query_map in (
         ("legacy_v4", args.legacy_v4_dir, {"legacy_v4_legacy_sequence": legacy_queries, "legacy_v4_corrected_sequence": corrected}),
         ("corrected_v4", args.corrected_v4_dir, {"corrected_v4_corrected_sequence": corrected}),
     ):
+        expected_variants = [name for base in query_map for name in (base, f"{base}_popularity")]
+        cached = {name: cache_dir / f"{name}.npy" for name in expected_variants}
+        if all(path.exists() for path in cached.values()):
+            print("loading cached rankings:", model_name, flush=True)
+            all_ranked.update({name: np.load(path) for name, path in cached.items()})
+            continue
         print("loading model:", model_name, flush=True)
         artifacts = load_artifacts(args.adaptive_root, args.base_gold_root, model_dir, device=device)
         item_ids, item_embeddings = encode_items(
@@ -208,8 +227,7 @@ def main() -> None:
             name: encode_users(artifacts.v4, frame, artifacts, batch_size=512)
             for name, frame in query_map.items()
         }
-        all_ranked.update(
-            retrieve_variants(
+        model_ranked = retrieve_variants(
                 query_embeddings,
                 item_embeddings,
                 item_ids,
@@ -220,8 +238,11 @@ def main() -> None:
                 args.query_batch_size,
                 args.popularity_blend_weight,
                 device,
-            )
         )
+        for name, values in model_ranked.items():
+            np.save(cached[name], values)
+            print("cached rankings:", cached[name], flush=True)
+        all_ranked.update(model_ranked)
         del artifacts, item_embeddings, query_embeddings
         gc.collect()
         if device.type == "cuda":

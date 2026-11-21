@@ -224,3 +224,27 @@ def test_sequence_encoder_supports_bfloat16_autocast_with_empty_rows():
     assert empty.shape == (2, 8)
     assert torch.isfinite(mixed).all()
     assert torch.isfinite(empty).all()
+
+
+def test_comparison_annotates_strict_prior_repeated_targets():
+    protocol = pd.DataFrame(
+        {
+            "user_id": [1, 1, 2],
+            "video_id": [10, 20, 30],
+            "query_time_ms": [2000, 1000, 3000],
+        }
+    )
+    history = {
+        1: (
+            torch.tensor([500, 1500]).numpy(),
+            torch.tensor([20, 10]).numpy(),
+        ),
+        2: (
+            torch.tensor([1000]).numpy(),
+            torch.tensor([99]).numpy(),
+        ),
+    }
+
+    result = comparison.annotate_target_repeats(protocol, history)
+
+    assert result["target_repeated_full_history"].tolist() == [True, True, False]
