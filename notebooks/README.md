@@ -38,6 +38,7 @@ The earlier V1 and V2 training notebooks were removed after V3 became the select
 15. `30_colab_v4_corrected_retraining.ipynb` - retrain the unchanged V4 architecture on corrected sequences with resumable Hugging Face checkpoints, then compare legacy-input, corrected-input, and corrected-retrained V4 under one locked A2 protocol.
 16. `31_colab_corrected_v4_author_affinity.ipynb` - calibrate strict-prior recent-author affinity over Corrected V4 on user-disjoint calibration users, then compare it with matched Corrected V4 and Legacy V4.2 on holdout users.
 17. `32_colab_rebuild_adaptive_test_protocol.ipynb` - rebuild the incomplete adaptive test split from complete Two-Tower Gold, lock an exact-target test protocol, and publish the large test artifacts directly to private Hugging Face storage.
+18. `33_colab_corrected_v4_locked_test_evaluation.ipynb` - reconstruct corrected strict-prior sequences for the locked test queries and make the final no-retuning promotion decision against Legacy V4.2.
 
 The pointwise V5, standalone V6, and checkpoint-only combined notebooks were removed because notebooks 18 and 19 replace those workflows.
 
@@ -61,3 +62,4 @@ The pointwise V5, standalone V6, and checkpoint-only combined notebooks were rem
 - Notebook 30 improved Corrected V4 holdout HR@1000 by about 7.3% and MRR@1000 by about 21.4% over legacy V4 receiving corrected sequences, but the paired HR@1000 interval crossed zero and cold-item HR regressed. Corrected V4 is therefore not promoted by itself. Notebook 31 is the active lightweight recovery experiment: it tunes author/popularity weights on disjoint calibration users and requires both statistically positive holdout gains and cold-item non-regression.
 - Notebook 31 selected author weight `0.2` and popularity weight `0.02`. Author affinity significantly improves matched Corrected V4 and restores cold-item retrieval, but the paired HR@1000 interval versus Legacy V4.2 still crosses zero. The branch remains the best experimental candidate rather than the serving default.
 - Notebook 32 is the active data step. It rebuilds the incomplete adaptive test split and locks the independent test protocol before any final promotion decision; no test metric is used to tune weights.
+- Notebook 32 passed all quality gates for 1,768,293 unique test examples and produced 11,737 locked queries from 983 users with zero timestamp violations. Notebook 33 is the active final evaluation step; its author/popularity weights are immutable literals copied from Notebook 31.

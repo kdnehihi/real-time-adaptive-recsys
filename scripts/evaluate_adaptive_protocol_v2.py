@@ -142,12 +142,16 @@ def load_item_snapshot(
     return accumulator.reset_index(drop=True)
 
 
-def build_safe_candidate_pool(adaptive_root: Path, split: str) -> pd.DataFrame:
+def build_safe_candidate_pool(
+    adaptive_root: Path,
+    split: str,
+    train_source: Path | None = None,
+) -> pd.DataFrame:
     """Use validation metadata, but only train-cutoff dynamic history features."""
     validation = load_item_snapshot(adaptive_root / "sequence_examples" / split, progress_label="catalog")
     candidate_ids = set(validation["video_id"].astype("int64"))
     train = load_item_snapshot(
-        adaptive_root / "sequence_examples/train",
+        train_source or (adaptive_root / "sequence_examples/train"),
         candidate_ids=candidate_ids,
         progress_label="train snapshots",
     )
@@ -199,12 +203,17 @@ def load_event_history(
     split: str,
     user_ids: set[int],
     max_time_ms: int,
+    train_source: Path | None = None,
 ) -> dict[int, tuple[np.ndarray, np.ndarray]]:
     """Load strict prior events from train plus the evaluation split for seen filtering."""
     parts: list[pd.DataFrame] = []
     columns = ["user_id", "video_id", "current_time_ms"]
-    for source_split in ("train", split):
-        files = parquet_files(adaptive_root / "sequence_examples" / source_split)
+    sources = (
+        ("train", train_source or (adaptive_root / "sequence_examples/train")),
+        (split, adaptive_root / "sequence_examples" / split),
+    )
+    for source_split, source_path in sources:
+        files = parquet_files(source_path)
         for index, file_path in enumerate(files, start=1):
             part = read_shard(file_path, columns)
             part = part[part["user_id"].isin(user_ids)]

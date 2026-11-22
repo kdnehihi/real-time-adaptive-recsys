@@ -524,10 +524,14 @@ def select_device(raw: str = "auto") -> torch.device:
     return torch.device("cpu")
 
 
-def prepare_train_vocab_frame(adaptive_root: Path, limit: int | None = None) -> pd.DataFrame:
+def prepare_train_vocab_frame(
+    adaptive_root: Path,
+    limit: int | None = None,
+    train_source: Path | None = None,
+) -> pd.DataFrame:
     """Read only train user IDs needed to reconstruct entity vocab shape."""
     return read_parquet(
-        adaptive_root / "sequence_examples/train",
+        train_source or (adaptive_root / "sequence_examples/train"),
         ["user_id"],
         limit,
         ds.field("target_class") == "STRONG_POSITIVE",
@@ -540,10 +544,14 @@ def prepare_item_pool(adaptive_root: Path, split: str, limit: int | None = None)
     return read_parquet(adaptive_root / "sequence_examples" / split, columns, limit).drop_duplicates("video_id", keep="last").reset_index(drop=True)
 
 
-def prepare_train_item_vocab_frame(adaptive_root: Path, limit: int | None = None) -> pd.DataFrame:
+def prepare_train_item_vocab_frame(
+    adaptive_root: Path,
+    limit: int | None = None,
+    train_source: Path | None = None,
+) -> pd.DataFrame:
     """Read only train item IDs needed to reconstruct the checkpoint vocabulary."""
     return read_parquet(
-        adaptive_root / "sequence_examples/train",
+        train_source or (adaptive_root / "sequence_examples/train"),
         ["video_id"],
         limit,
     ).drop_duplicates("video_id").reset_index(drop=True)
@@ -557,6 +565,7 @@ def load_artifacts(
     device: torch.device | None = None,
     train_vocab_limit: int | None = None,
     item_pool_limit: int | None = None,
+    train_source: Path | None = None,
 ) -> LoadedAdaptiveArtifacts:
     """Load V4/V5 checkpoints plus the train-fitted preprocessing objects."""
     device = device or select_device()
@@ -565,8 +574,16 @@ def load_artifacts(
     # defaults to weights_only=True, which rejects that trusted metadata.
     v4_ckpt = torch.load(v4_dir / "best_model.pt", map_location="cpu", weights_only=False)
     v4_cfg = v4_ckpt["config"]
-    train_for_vocab = prepare_train_vocab_frame(adaptive_root, train_vocab_limit or v4_cfg.get("max_train_examples"))
-    item_pool = prepare_train_item_vocab_frame(adaptive_root, item_pool_limit or v4_cfg.get("max_item_pool_examples"))
+    train_for_vocab = prepare_train_vocab_frame(
+        adaptive_root,
+        train_vocab_limit or v4_cfg.get("max_train_examples"),
+        train_source=train_source,
+    )
+    item_pool = prepare_train_item_vocab_frame(
+        adaptive_root,
+        item_pool_limit or v4_cfg.get("max_item_pool_examples"),
+        train_source=train_source,
+    )
     vocabs = build_vocabs(base_gold_root, train_for_vocab, item_pool)
     vocab_sizes = v4_ckpt.get("vocab_sizes", {key: vocab.size for key, vocab in vocabs.items()})
     numeric = NumericalPreprocessor(base_gold_root / "transforms/numeric_stats.json")

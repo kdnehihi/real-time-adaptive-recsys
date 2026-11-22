@@ -72,11 +72,15 @@ def parse_args() -> argparse.Namespace:
     return parser.parse_args()
 
 
-def corrected_queries(legacy: pd.DataFrame, corrected_root: Path) -> pd.DataFrame:
+def corrected_queries(
+    legacy: pd.DataFrame,
+    corrected_root: Path,
+    split: str = "validation",
+) -> pd.DataFrame:
     """Replace only sequence fields while preserving the locked query/features contract."""
     ids = legacy["example_id"].tolist()
     delta = read_parquet(
-        corrected_root / "sequences" / "split=validation",
+        corrected_root / "sequences" / f"split={split}",
         ["example_id", *CORRECTED_COLUMNS],
         filter_expr=ds.field("example_id").isin(ids),
     ).drop_duplicates("example_id", keep="last")

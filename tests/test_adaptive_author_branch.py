@@ -11,6 +11,7 @@ from recommender.models.adaptive.author_branch import (
 )
 from scripts.evaluate_adaptive_author_affinity import deterministic_user_split, score_configs
 from scripts.evaluate_corrected_v4_author_affinity import acceptance_decision
+from scripts.evaluate_corrected_v4_author_affinity_test import final_acceptance
 
 
 def test_author_vocab_reserves_oov_and_inputs_are_point_ordered():
@@ -101,3 +102,20 @@ def test_corrected_author_affinity_acceptance_requires_all_three_gates():
     rejected = acceptance_decision(0.1, positive, positive, cold_regression, matched)
     assert rejected["cold_item_non_regression_gate"] is False
     assert rejected["accepted"] is False
+
+
+def test_locked_test_acceptance_requires_legacy_and_cold_item_gates():
+    positive = {
+        "hitrate@1000": {"delta": 0.01, "ci95_low": 0.001, "ci95_high": 0.02}
+    }
+    selected = {"cold": {"hitrate@1000": 0.02}}
+    matched = {"cold": {"hitrate@1000": 0.019}}
+    legacy = {"cold": {"hitrate@1000": 0.018}}
+    assert final_acceptance(positive, positive, selected, matched, legacy)["accepted"] is True
+
+    uncertain = {
+        "hitrate@1000": {"delta": 0.01, "ci95_low": -0.001, "ci95_high": 0.02}
+    }
+    gates = final_acceptance(positive, uncertain, selected, matched, legacy)
+    assert gates["legacy_promotion_test_gate"] is False
+    assert gates["accepted"] is False

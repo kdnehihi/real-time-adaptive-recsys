@@ -469,3 +469,25 @@ and cold targets; it is not copied. Large test artifacts are published under
 `adaptive_test/v1/` in private Hugging Face storage, while Drive receives only
 small manifests and logs. The fixed Notebook 31 weights must remain unchanged
 in the subsequent test evaluation.
+
+Notebook 32 completed with 1,768,293 distinct test examples, 986 users,
+886,302 items, complete user/item/sequence-context joins, and zero global or
+session timestamp violations. The locked protocol contains 11,737 exact-target
+queries from 983 users. Approximately 74.1% of targets are cold relative to
+train, making cold-item non-regression a material final gate rather than an
+auxiliary diagnostic.
+
+### Final corrected V4 locked-test evaluation
+
+`33_colab_corrected_v4_locked_test_evaluation.ipynb` freezes the Notebook 31
+configuration at author weight `0.2`, popularity weight `0.02`, and recency tau
+`3.0`. It reconstructs corrected timestamp-batch sequences only for locked test
+queries and persists that small delta before exact retrieval begins, allowing a
+failed Colab evaluation to resume without rerunning Spark.
+
+The final report compares raw Corrected V4, matched-popularity Corrected V4,
+fixed Corrected V4 plus author affinity, and Legacy V4.2 on the same test
+queries and candidates. Promotion requires a strictly positive paired
+user-bootstrap HR@1000 interval against both the matched corrected baseline and
+Legacy V4.2, plus cold-item HR@1000 non-regression against both. Test results
+must never be used to change the frozen weights.
