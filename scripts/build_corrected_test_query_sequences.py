@@ -69,6 +69,36 @@ def protocol_frame(path: Path) -> pd.DataFrame:
     return frame
 
 
+def resolve_exact_query_clocks(queries, history):
+    """Resolve millisecond query clocks from immutable canonical event IDs.
+
+    Locked protocol timestamps are second-precision and must not be used for an
+    equality join to millisecond event contexts.  The query ``example_id`` is
+    the canonical history ``event_id``, so this join preserves the locked query
+    population while recovering its exact event time.
+    """
+    return (
+        queries.alias("q")
+        .join(
+            history.select(
+                F.col("event_id").cast("string").alias("example_id"),
+                "user_id",
+                F.col("time_ms").alias("current_time_ms"),
+            ).alias("e"),
+            (F.col("q.example_id") == F.col("e.example_id"))
+            & (F.col("q.user_id") == F.col("e.user_id")),
+            "inner",
+        )
+        .select(
+            "q.example_id",
+            "q.user_id",
+            "q.query_time_ms",
+            "e.current_time_ms",
+        )
+        .dropDuplicates(["example_id"])
+    )
+
+
 def main() -> None:
     args = parse_args()
     history_path = args.base_gold_root / "history/events"
@@ -97,7 +127,13 @@ def main() -> None:
     )
     queries = spark.createDataFrame(protocol, schema=schema).persist()
     users = queries.select("user_id").distinct()
-    maximum_time = int(protocol["query_time_ms"].max())
+    # Protocol v2 intentionally stores a compact query clock derived from
+    # ``as_of_time``.  That timestamp has second precision, while canonical
+    # event history retains milliseconds.  It is therefore suitable for the
+    # locked retrieval protocol but not for an equality join to event-time
+    # sequence contexts.  Read the final protocol second as well (+999 ms),
+    # then recover each query's exact clock from its immutable event ID.
+    maximum_protocol_time = int(protocol["query_time_ms"].max())
     print(f"locked queries/users: {len(protocol):,}/{protocol['user_id'].nunique():,}", flush=True)
 
     required_history = ["event_id", "user_id", *EVENT_VALUE_COLUMNS]
@@ -105,25 +141,48 @@ def main() -> None:
         spark.read.parquet(str(history_path))
         .select(*required_history)
         .join(F.broadcast(users), "user_id", "inner")
-        .where(F.col("time_ms") <= F.lit(maximum_time))
+        .where(F.col("time_ms") <= F.lit(maximum_protocol_time + 999))
         .dropDuplicates(["event_id"])
         .persist(StorageLevel.DISK_ONLY)
     )
     history_count = history.count()
     print(f"canonical events for selected users: {history_count:,}", flush=True)
+    query_clocks = resolve_exact_query_clocks(queries, history).persist()
+    resolved_clock_count = query_clocks.count()
+    if resolved_clock_count != len(protocol):
+        raise AssertionError(
+            "Could not resolve an exact canonical event clock for every locked query: "
+            f"resolved={resolved_clock_count:,}, expected={len(protocol):,}"
+        )
+    clock_row = query_clocks.agg(
+        F.min(F.col("current_time_ms") - F.col("query_time_ms")).alias("min_delta_ms"),
+        F.max(F.col("current_time_ms") - F.col("query_time_ms")).alias("max_delta_ms"),
+    ).first()
+    if int(clock_row["min_delta_ms"]) < 0 or int(clock_row["max_delta_ms"]) > 999:
+        raise AssertionError(
+            "Canonical event clock is outside the protocol timestamp's source second: "
+            f"min_delta_ms={clock_row['min_delta_ms']}, "
+            f"max_delta_ms={clock_row['max_delta_ms']}"
+        )
+    print(
+        "resolved exact query clocks: "
+        f"{resolved_clock_count:,}; millisecond delta range="
+        f"[{clock_row['min_delta_ms']}, {clock_row['max_delta_ms']}]",
+        flush=True,
+    )
     context = build_strict_prior_global_context(history, args.max_sequence_len)
     corrected = (
-        queries.alias("q")
+        query_clocks.alias("q")
         .join(
             context.alias("c"),
             (F.col("q.user_id") == F.col("c.user_id"))
-            & (F.col("q.query_time_ms") == F.col("c.time_ms")),
+            & (F.col("q.current_time_ms") == F.col("c.time_ms")),
             "inner",
         )
         .select(
             "q.example_id",
             "q.user_id",
-            F.col("q.query_time_ms").alias("current_time_ms"),
+            "q.current_time_ms",
             *[F.col(f"c.{name}").alias(name) for name in CORRECTED_COLUMNS],
         )
     )
@@ -165,6 +224,12 @@ def main() -> None:
         "semantics": "complete current timestamp batch excluded before sequence cap",
         "max_sequence_len": args.max_sequence_len,
         "canonical_events": history_count,
+        "query_clock": {
+            "source": "canonical history event_id == locked protocol example_id",
+            "resolved_queries": resolved_clock_count,
+            "min_delta_from_protocol_ms": int(clock_row["min_delta_ms"]),
+            "max_delta_from_protocol_ms": int(clock_row["max_delta_ms"]),
+        },
         "quality": quality,
         "elapsed_seconds": time.perf_counter() - started,
         "artifact_path": "sequences/split=test",
