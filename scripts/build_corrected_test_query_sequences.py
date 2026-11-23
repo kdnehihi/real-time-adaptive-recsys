@@ -70,18 +70,28 @@ def protocol_frame(path: Path) -> pd.DataFrame:
 
 
 def resolve_exact_query_clocks(queries, history):
-    """Resolve millisecond query clocks from immutable canonical event IDs.
+    """Resolve millisecond query clocks using the immutable Gold example key.
 
     Locked protocol timestamps are second-precision and must not be used for an
-    equality join to millisecond event contexts.  The query ``example_id`` is
-    the canonical history ``event_id``, so this join preserves the locked query
-    population while recovering its exact event time.
+    equality join to millisecond event contexts.  Two-Tower Gold defines an
+    example ID as SHA-256(``example||event_id||time_ms``), so reproducing that
+    key from canonical history preserves the locked query population while
+    recovering each query's exact event time.
     """
+    canonical_example_id = F.sha2(
+        F.concat_ws(
+            "||",
+            F.lit("example"),
+            F.col("event_id").cast("string"),
+            F.col("time_ms").cast("string"),
+        ),
+        256,
+    )
     return (
         queries.alias("q")
         .join(
             history.select(
-                F.col("event_id").cast("string").alias("example_id"),
+                canonical_example_id.alias("example_id"),
                 "user_id",
                 F.col("time_ms").alias("current_time_ms"),
             ).alias("e"),
@@ -225,7 +235,7 @@ def main() -> None:
         "max_sequence_len": args.max_sequence_len,
         "canonical_events": history_count,
         "query_clock": {
-            "source": "canonical history event_id == locked protocol example_id",
+            "source": "canonical Gold SHA256(example||event_id||time_ms)",
             "resolved_queries": resolved_clock_count,
             "min_delta_from_protocol_ms": int(clock_row["min_delta_ms"]),
             "max_delta_from_protocol_ms": int(clock_row["max_delta_ms"]),
