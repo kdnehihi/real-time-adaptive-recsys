@@ -26,6 +26,7 @@ The current scope is data understanding and batch preprocessing. Kafka, streamin
 - `data/features/`: feature tables for model training and future online sync.
 
 See `docs/storage_layer.md` for more detail.
+See `docs/project_overview_vi.md` for a Vietnamese end-to-end explanation of the project, data, models, splits, evaluation, and current status.
 See `docs/gold_data_design.md` for the current ALS baseline and Two-Tower Gold dataset contracts.
 See `docs/two_tower_feature_encoding.md` for the current PyTorch feature encoder design.
 See `docs/two_tower_training.md` for the first Two-Tower MLP training pipeline.
