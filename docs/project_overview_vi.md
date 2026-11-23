@@ -376,16 +376,19 @@ Test vật lý đã được rebuild độc lập:
 - Khoảng 74,1% target là cold so với Train.
 
 Notebook 33 đóng băng weight từ Validation và so sánh Corrected V4, Corrected
-V4 + author affinity và Legacy V4.2. Tại thời điểm viết tài liệu này, corrected
-test-sequence builder vừa được sửa để resolve millisecond event time bằng đúng
-Gold key:
+V4 + author affinity và Legacy V4.2. Corrected test sequence đạt đủ 11.737 row,
+không có timestamp/alignment violation và resolve millisecond event time bằng
+đúng Gold key:
 
 ```text
 example_id = SHA256("example||event_id||time_ms")
 ```
 
-Final locked-test metric vẫn đang chờ notebook chạy hoàn tất. Không được thay
-weight dựa trên kết quả Test.
+Fixed author affinity tăng Corrected HR@1000 từ 1,2394% lên 1,4513% và cải thiện
+cold HR@1000 rõ rệt. Legacy V4.2 đạt 1,4174%; Corrected cao hơn nhẹ nhưng paired
+CI95 của chênh lệch vẫn cắt zero. Warm HR@1000 của Corrected thấp hơn Legacy
+(4,0184% so với 4,4861%), nên promotion gate cuối không pass. Không được thay
+weight dựa trên kết quả Test này.
 
 ## 10. Artifact được lưu ở đâu?
 
@@ -427,13 +430,15 @@ artifact. Colab dùng `HF_TOKEN` để đọc và `HF_WRITE_TOKEN` để upload.
 - V4.1/V4.2 author experiments.
 - Corrected sequence contract, corrected delta và Corrected V4 retraining.
 - V6 timestamp replay và true online-state reducer.
-- Independent test rebuild và locked test protocol.
+- Independent test rebuild, locked test protocol và final Notebook 33 report.
 
 Việc ngay trước mắt:
 
-1. Chạy hoàn tất Notebook 33 với runtime đã sửa.
-2. Đọc locked-test report nhưng không tune lại trên Test.
-3. Chọn serving candidate theo predeclared promotion gates.
+1. Chạy Notebook 34 trên Validation để kiểm tra V4.3 static/long-term
+   warm-retention branch.
+2. Nếu validation holdout không pass, dừng scalar blending và chuyển sang
+   semantic content hoặc ALS warm-candidate source.
+3. Không chạy lại/tune trên locked Test đã được sử dụng.
 
 Sau final test, hướng cải thiện có giá trị nhất là:
 

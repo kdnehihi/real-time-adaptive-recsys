@@ -491,3 +491,33 @@ queries and candidates. Promotion requires a strictly positive paired
 user-bootstrap HR@1000 interval against both the matched corrected baseline and
 Legacy V4.2, plus cold-item HR@1000 non-regression against both. Test results
 must never be used to change the frozen weights.
+
+Notebook 33 completed all data gates for 11,737 queries, 983 users, and 886,302
+candidate items. Corrected sequence coverage was complete, and timestamp and
+array-alignment violations were both zero. Fixed author affinity improved
+Corrected V4 HR@1000 from 1.2394% to 1.4513%; its paired interval versus the
+same-popularity Corrected baseline was fully positive. Cold HR@1000 improved
+to 0.3906%, compared with 0.2651% for Legacy V4.2.
+
+The full promotion gate nevertheless failed. Legacy V4.2 reached 1.4174%
+HR@1000, so the corrected policy's point estimate was 0.0339 percentage points
+higher, but the paired CI95 was `[-0.1780, 0.2458]` percentage points. The
+corrected policy improved cold retrieval and several NDCG/MRR metrics but
+regressed warm HR@1000 from 4.4861% to 4.0184%. Corrected sequence semantics
+remain the required production foundation, while Legacy V4.2 remains a
+historical benchmark rather than a deployable online-state contract.
+
+### V4.3 warm-retention validation branch
+
+`34_colab_corrected_v4_3_warm_retention.ipynb` is the next validation-only
+experiment. It does not retrain the Transformer and cannot read the consumed
+Test protocol. It combines the fixed Corrected V4 adaptive/author/popularity
+score with a static long-term score produced by the same corrected checkpoint
+after removing recent-sequence inputs.
+
+Calibration evaluates global and warm-item-only static score modes on one user
+partition. A disjoint validation holdout accepts the branch only when overall
+and warm HR@1000 paired intervals are positive and cold HR@1000 does not
+regress. Legacy V4.2 is reported as a historical reference. If the branch
+fails, no additional Test run is allowed; the project moves to semantic item
+features or an ALS warm-candidate source.
