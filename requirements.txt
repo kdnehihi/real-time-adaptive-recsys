@@ -23,6 +23,11 @@ setuptools==75.1.0
 # Neural feature encoding
 torch==2.3.1
 
+# Online recommendation API
+fastapi==0.115.0
+uvicorn==0.30.6
+httpx==0.27.2
+
 # Optional lightweight hyperparameter tuning for interaction-strength weights
 optuna==3.6.1
 

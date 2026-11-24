@@ -35,9 +35,10 @@ class ExactAdaptiveIndex:
         if len(np.unique(item_ids)) != size:
             raise ValueError("Serving item IDs must be unique")
         self.item_ids_np = np.asarray(item_ids, dtype=np.int64)
+        self.author_ids_np = np.asarray(author_ids, dtype=np.int64)
         self.item_to_index = {int(value): index for index, value in enumerate(self.item_ids_np)}
         self.item_embeddings = torch.as_tensor(item_embeddings, dtype=torch.float32, device=device)
-        self.author_ids = torch.as_tensor(author_ids, dtype=torch.long, device=device)
+        self.author_ids = torch.as_tensor(self.author_ids_np, dtype=torch.long, device=device)
         self.popularity = torch.as_tensor(popularity, dtype=torch.float32, device=device)
         self.eligible_from_ms = torch.as_tensor(eligible_from_ms, dtype=torch.long, device=device)
         self.device = device

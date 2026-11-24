@@ -43,6 +43,7 @@ The earlier V1 and V2 training notebooks were removed after V3 became the select
 20. `35_colab_corrected_v4_ann_serving_benchmark.ipynb` - benchmark FAISS HNSW against exact Corrected V4.2 full-policy search, including Top-1000 parity, target quality, latency, index size, and complete-output gates.
 21. `36_colab_corrected_v4_exact_serving_bundle.ipynb` - export the selected exact-GPU item catalog, smoke-test the immutable retrieval policy, and publish the compact FP16 storage bundle to private Hugging Face storage.
 22. `37_colab_corrected_v4_serving_preprocessing.ipynb` - export train-fitted entity/categorical vocabularies, numeric transforms, and a standalone request schema so the user encoder no longer reads Gold data at runtime.
+23. `38_colab_adaptive_serving_api_benchmark.ipynb` - load only private serving artifacts, exercise strict-prior request encoding plus exact retrieval through FastAPI, and report GPU latency, throughput, and memory.
 
 The pointwise V5, standalone V6, and checkpoint-only combined notebooks were removed because notebooks 18 and 19 replace those workflows.
 
@@ -74,3 +75,4 @@ The pointwise V5, standalone V6, and checkpoint-only combined notebooks were rem
 - Notebook 35 rejected HNSW: Top-1000 overlap remained near 76%, target HitRate regressed, some queries returned fewer than 1,000 items, and high-recall settings were slower than the 6.04 ms/query exact GPU oracle.
 - Notebook 36 is the active serving step. It packages the exact item matrix in FP16 storage form and verifies full-policy retrieval before publishing the bundle outside Drive.
 - Notebook 36 completed and its remote files match the manifest. Notebook 37 is the active contract step: it removes the remaining Gold-data dependency from request-time user encoding.
+- Notebook 37 passed its standalone encoder smoke test with checkpoint-compatible vocab sizes. Notebook 38 is the active request-level serving benchmark.

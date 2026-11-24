@@ -577,3 +577,16 @@ ID mappings at request time.
 entity and categorical vocabularies, numeric transform statistics, and the
 request schema as a companion artifact. Its standalone encoder smoke test must
 pass without reading Gold data before request-level API work begins.
+
+Notebook 37 completed remotely with exact checkpoint-compatible vocabulary
+sizes: 995 user IDs, 3,215,508 video IDs, 8 user-activity values, 4 video
+types, 33 upload types, and 4 event types, all including OOV index zero. The
+standalone user encoder returned a normalized `[1, 128]` vector and declared no
+runtime Gold dependency.
+
+`38_colab_adaptive_serving_api_benchmark.ipynb` is the first end-to-end serving
+step. It downloads only private Hugging Face artifacts, constructs strict-prior
+request sequences, encodes users, runs fixed-policy exact retrieval, and tests
+the FastAPI `/health` and `/recommend` contracts. It reports model/catalog load
+time, batch-1/8/32 p50/p95 latency, effective throughput, valid Top-K coverage,
+and peak GPU allocation.

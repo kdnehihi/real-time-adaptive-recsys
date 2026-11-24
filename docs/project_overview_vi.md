@@ -435,13 +435,14 @@ artifact. Colab dùng `HF_TOKEN` để đọc và `HF_WRITE_TOKEN` để upload.
 - HNSW serving benchmark; ANN bị reject vì parity thấp và không nhanh hơn exact
   đủ để bù chất lượng mất đi.
 - Exact item serving bundle đã upload đầy đủ lên private Hugging Face.
+- Standalone preprocessing đã pass; request-time user encoder không còn phụ
+  thuộc Gold data.
 
 Việc ngay trước mắt:
 
-1. Chạy Notebook 37 bằng CPU High-RAM để export train-fitted preprocessing và
-   request schema; serving sau đó không cần đọc Gold data.
-2. Ghép preprocessing, V4 checkpoint và exact catalog thành request-level API,
-   rồi benchmark latency/concurrency.
+1. Chạy Notebook 38 trên L4/A100 để benchmark end-to-end request flow và
+   FastAPI contract từ toàn bộ artifact trên Hugging Face.
+2. Dùng latency/throughput/memory report để chọn deployment shape và batching.
 3. Không train/tune thêm hoặc chạy lại locked Test ở bước serving.
 
 Sau final test, hướng cải thiện có giá trị nhất là:
@@ -475,6 +476,7 @@ Nếu muốn hiểu dự án mà không chạy lại toàn bộ:
 9. `35`: ANN serving parity, latency và memory benchmark.
 10. `36`: exact GPU serving bundle và smoke test retrieval policy.
 11. `37`: standalone train-fitted preprocessing contract cho user encoder.
+12. `38`: end-to-end FastAPI request flow và GPU latency/throughput benchmark.
 
 Tài liệu chi tiết liên quan:
 
