@@ -434,13 +434,15 @@ artifact. Colab dùng `HF_TOKEN` để đọc và `HF_WRITE_TOKEN` để upload.
 - V4.3 static-retention validation; branch bị reject và không mở lại locked Test.
 - HNSW serving benchmark; ANN bị reject vì parity thấp và không nhanh hơn exact
   đủ để bù chất lượng mất đi.
+- Exact item serving bundle đã upload đầy đủ lên private Hugging Face.
 
 Việc ngay trước mắt:
 
-1. Chạy Notebook 36 để export exact serving bundle và upload trực tiếp lên
-   private Hugging Face repo.
-2. Dùng serving bundle để dựng request-level API và benchmark concurrency.
-3. Không train/tune thêm hoặc chạy lại locked Test ở bước đóng gói serving.
+1. Chạy Notebook 37 bằng CPU High-RAM để export train-fitted preprocessing và
+   request schema; serving sau đó không cần đọc Gold data.
+2. Ghép preprocessing, V4 checkpoint và exact catalog thành request-level API,
+   rồi benchmark latency/concurrency.
+3. Không train/tune thêm hoặc chạy lại locked Test ở bước serving.
 
 Sau final test, hướng cải thiện có giá trị nhất là:
 
@@ -472,6 +474,7 @@ Nếu muốn hiểu dự án mà không chạy lại toàn bộ:
    warm-retention rejection.
 9. `35`: ANN serving parity, latency và memory benchmark.
 10. `36`: exact GPU serving bundle và smoke test retrieval policy.
+11. `37`: standalone train-fitted preprocessing contract cho user encoder.
 
 Tài liệu chi tiết liên quan:
 

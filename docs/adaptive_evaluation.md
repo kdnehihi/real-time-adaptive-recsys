@@ -565,3 +565,15 @@ storage; Drive receives only its manifest and log. Serving converts embeddings
 to FP32 on GPU and reapplies author, popularity, time, and seen-item policy in
 one exact pass. ANN remains a future scaling option rather than a prerequisite
 for the first serving prototype.
+
+Notebook 36 completed the catalog export for 854,893 items at 128 dimensions.
+The five immutable arrays total about 231.6 MiB and were verified remotely in
+private Hugging Face storage with byte sizes matching the manifest. The item
+matrix uses FP16 at rest and FP32 for retrieval compute. This catalog is
+complete for scoring but deliberately does not rebuild train-fitted user/item
+ID mappings at request time.
+
+`37_colab_corrected_v4_serving_preprocessing.ipynb` exports those train-fitted
+entity and categorical vocabularies, numeric transform statistics, and the
+request schema as a companion artifact. Its standalone encoder smoke test must
+pass without reading Gold data before request-level API work begins.
