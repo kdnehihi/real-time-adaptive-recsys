@@ -546,3 +546,22 @@ per-query search/rerank latency. A configuration passes only with at least 95%
 mean Top-1000 overlap, no more than 0.1 percentage-point target HitRate loss,
 and complete Top-1000 output. It uses validation holdout only and cannot read
 the locked Test protocol.
+
+Notebook 35 rejected HNSW for the current catalog. At `efSearch=5000`, mean
+Top-1000 overlap was only 75.27%, exact-target HitRate fell from 2.4% to 2.0%,
+and 33 of 1,000 queries returned fewer than 1,000 valid candidates. Increasing
+`efSearch` to 10,000 improved overlap only to 76.08% while increasing latency
+to 13.76 ms/query. Exact GPU search took 6.04 ms/query; the fastest HNSW run
+took 5.79 ms/query but failed quality and completeness gates. Its 639 MiB index
+also exceeded the approximately 417 MiB FP32 item matrix. Exact GPU retrieval
+is therefore the selected initial serving implementation.
+
+### Exact serving bundle
+
+`36_colab_corrected_v4_exact_serving_bundle.ipynb` exports the immutable
+Corrected V4.2 candidate catalog, FP16 item embeddings, author IDs, popularity,
+and eligibility clocks. The bundle is uploaded directly to private Hugging Face
+storage; Drive receives only its manifest and log. Serving converts embeddings
+to FP32 on GPU and reapplies author, popularity, time, and seen-item policy in
+one exact pass. ANN remains a future scaling option rather than a prerequisite
+for the first serving prototype.

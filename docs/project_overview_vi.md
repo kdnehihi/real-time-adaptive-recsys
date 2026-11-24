@@ -432,14 +432,15 @@ artifact. Colab dùng `HF_TOKEN` để đọc và `HF_WRITE_TOKEN` để upload.
 - V6 timestamp replay và true online-state reducer.
 - Independent test rebuild, locked test protocol và final Notebook 33 report.
 - V4.3 static-retention validation; branch bị reject và không mở lại locked Test.
+- HNSW serving benchmark; ANN bị reject vì parity thấp và không nhanh hơn exact
+  đủ để bù chất lượng mất đi.
 
 Việc ngay trước mắt:
 
-1. Chạy Notebook 35 để benchmark FAISS HNSW so với exact full-policy của
-   Corrected V4.2 trên Validation holdout.
-2. Chọn ANN config chỉ khi Top-1000 overlap, target HitRate và output coverage
-   đều qua gate; index lớn chỉ nằm trên local Colab disk.
-3. Không train/tune thêm hoặc chạy lại locked Test ở bước serving benchmark.
+1. Chạy Notebook 36 để export exact serving bundle và upload trực tiếp lên
+   private Hugging Face repo.
+2. Dùng serving bundle để dựng request-level API và benchmark concurrency.
+3. Không train/tune thêm hoặc chạy lại locked Test ở bước đóng gói serving.
 
 Sau final test, hướng cải thiện có giá trị nhất là:
 
@@ -470,6 +471,7 @@ Nếu muốn hiểu dự án mà không chạy lại toàn bộ:
 8. `32` -> `34`: independent Test, final evaluation và validation-only
    warm-retention rejection.
 9. `35`: ANN serving parity, latency và memory benchmark.
+10. `36`: exact GPU serving bundle và smoke test retrieval policy.
 
 Tài liệu chi tiết liên quan:
 
