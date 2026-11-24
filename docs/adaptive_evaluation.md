@@ -590,3 +590,15 @@ request sequences, encodes users, runs fixed-policy exact retrieval, and tests
 the FastAPI `/health` and `/recommend` contracts. It reports model/catalog load
 time, batch-1/8/32 p50/p95 latency, effective throughput, valid Top-K coverage,
 and peak GPU allocation.
+
+The first L4 run passed both API smoke paths and loaded all artifacts in 12.2
+seconds. Batch-1 p95 latency was 75.4 ms at 13.5 requests/second. Batch 8
+reached 87.1 requests/second with 92.5 ms batch p95, while batch 32 reached
+168.5 requests/second with 192.3 ms batch p95. Peak allocated GPU memory was
+4.47 GB. These results support exact retrieval for the prototype and motivate
+dynamic micro-batching rather than ANN.
+
+Notebook 38 now uses a v2 runtime with a 5 ms / 32-request dynamic batcher and
+adds a 32-client concurrent HTTP benchmark. The batcher has one GPU worker,
+preserves strict-prior validation per request, and returns each request's own
+Top-K slice.

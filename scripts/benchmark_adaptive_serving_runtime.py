@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import argparse
+import concurrent.futures
 import json
 import statistics
 import sys
@@ -106,10 +107,6 @@ def main() -> None:
             }
         )
 
-    client = TestClient(create_app(runtime))
-    health = client.get("/health")
-    if health.status_code != 200 or health.json()["candidate_items"] != len(item_values):
-        raise RuntimeError("FastAPI health smoke failed")
     api_payload = {
         "user_id": int(user_values[0]),
         "current_time_ms": max_clock,
@@ -117,9 +114,24 @@ def main() -> None:
         "seen_item_ids": list(requests(1)[0].seen_item_ids),
         "top_k": args.top_k,
     }
-    api_response = client.post("/recommend", json=api_payload)
-    if api_response.status_code != 200 or len(api_response.json()["item_ids"]) != args.top_k:
-        raise RuntimeError(f"FastAPI recommendation smoke failed: {api_response.text}")
+    http_latencies: list[float] = []
+    http_requests = 96
+    http_start = time.perf_counter()
+    with TestClient(create_app(runtime, max_batch_size=32, batch_wait_ms=5.0)) as client:
+        health = client.get("/health")
+        if health.status_code != 200 or health.json()["candidate_items"] != len(item_values):
+            raise RuntimeError("FastAPI health smoke failed")
+
+        def post_one(_: int) -> None:
+            start = time.perf_counter()
+            response = client.post("/recommend", json=api_payload)
+            http_latencies.append((time.perf_counter() - start) * 1000.0)
+            if response.status_code != 200 or len(response.json()["item_ids"]) != args.top_k:
+                raise RuntimeError(f"FastAPI recommendation failed: {response.text}")
+
+        with concurrent.futures.ThreadPoolExecutor(max_workers=32) as pool:
+            list(pool.map(post_one, range(http_requests)))
+    http_elapsed = time.perf_counter() - http_start
     report = {
         "benchmark": "corrected_v4_2_standalone_serving_v1",
         "device": str(device),
@@ -129,6 +141,14 @@ def main() -> None:
         "top_k": args.top_k,
         "results": rows,
         "api_smoke": {"health": True, "recommend": True},
+        "concurrent_http": {
+            "requests": http_requests,
+            "clients": 32,
+            "batch_wait_ms": 5.0,
+            "latency_p50_ms": percentile(http_latencies, 0.50),
+            "latency_p95_ms": percentile(http_latencies, 0.95),
+            "throughput_requests_per_second": http_requests / http_elapsed,
+        },
         "gpu_peak_allocated_bytes": torch.cuda.max_memory_allocated(device) if device.type == "cuda" else 0,
         "gold_data_read": False,
         "locked_test_used": False,

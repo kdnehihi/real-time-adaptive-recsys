@@ -437,12 +437,14 @@ artifact. Colab dùng `HF_TOKEN` để đọc và `HF_WRITE_TOKEN` để upload.
 - Exact item serving bundle đã upload đầy đủ lên private Hugging Face.
 - Standalone preprocessing đã pass; request-time user encoder không còn phụ
   thuộc Gold data.
+- End-to-end L4 serving pass: batch-1 p95 75,4 ms, batch-32 throughput 168,5
+  request/s và peak allocation khoảng 4,47 GB.
 
 Việc ngay trước mắt:
 
-1. Chạy Notebook 38 trên L4/A100 để benchmark end-to-end request flow và
-   FastAPI contract từ toàn bộ artifact trên Hugging Face.
-2. Dùng latency/throughput/memory report để chọn deployment shape và batching.
+1. Chạy lại Notebook 38 v2 trên L4 để benchmark dynamic batching với 32 HTTP
+   clients đồng thời.
+2. Dùng concurrent p95/throughput để chốt batch wait và deployment shape.
 3. Không train/tune thêm hoặc chạy lại locked Test ở bước serving.
 
 Sau final test, hướng cải thiện có giá trị nhất là:
