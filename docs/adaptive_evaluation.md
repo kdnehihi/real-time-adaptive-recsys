@@ -521,3 +521,28 @@ and warm HR@1000 paired intervals are positive and cold HR@1000 does not
 regress. Legacy V4.2 is reported as a historical reference. If the branch
 fails, no additional Test run is allowed; the project moves to semantic item
 features or an ALS warm-candidate source.
+
+Notebook 34 evaluated 15 static-retention configurations and correctly selected
+the zero-weight fallback. Even the smallest global weight reduced warm HR@1000
+on calibration users, while warm-only blending also damaged cold retrieval.
+The branch therefore failed before another Test run. On the disjoint validation
+holdout, the unmodified Corrected V4.2 point estimate remained above Legacy
+V4.2 for overall, warm, and cold HR@1000, but its paired overall interval still
+crossed zero. This disagreement with the locked-Test warm segment means further
+validation-only scalar tuning cannot reliably repair Test and must stop.
+
+### Corrected V4.2 ANN serving benchmark
+
+`35_colab_corrected_v4_ann_serving_benchmark.ipynb` moves the project from
+offline model iteration to serving readiness. Full-policy exact matrix search
+is the oracle. FAISS HNSW retrieves an over-generated vector shortlist, after
+which the fixed author/popularity score and the identical time-eligibility and
+prior-seen masks are reapplied.
+
+The first bounded run uses a deterministic 1,000-query holdout sample and
+reports exact Top-1000 overlap recall, exact-target HitRate delta,
+queries returning fewer than 1,000 valid candidates, index size/build time, and
+per-query search/rerank latency. A configuration passes only with at least 95%
+mean Top-1000 overlap, no more than 0.1 percentage-point target HitRate loss,
+and complete Top-1000 output. It uses validation holdout only and cannot read
+the locked Test protocol.

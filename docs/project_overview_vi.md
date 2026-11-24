@@ -431,14 +431,15 @@ artifact. Colab dùng `HF_TOKEN` để đọc và `HF_WRITE_TOKEN` để upload.
 - Corrected sequence contract, corrected delta và Corrected V4 retraining.
 - V6 timestamp replay và true online-state reducer.
 - Independent test rebuild, locked test protocol và final Notebook 33 report.
+- V4.3 static-retention validation; branch bị reject và không mở lại locked Test.
 
 Việc ngay trước mắt:
 
-1. Chạy Notebook 34 trên Validation để kiểm tra V4.3 static/long-term
-   warm-retention branch.
-2. Nếu validation holdout không pass, dừng scalar blending và chuyển sang
-   semantic content hoặc ALS warm-candidate source.
-3. Không chạy lại/tune trên locked Test đã được sử dụng.
+1. Chạy Notebook 35 để benchmark FAISS HNSW so với exact full-policy của
+   Corrected V4.2 trên Validation holdout.
+2. Chọn ANN config chỉ khi Top-1000 overlap, target HitRate và output coverage
+   đều qua gate; index lớn chỉ nằm trên local Colab disk.
+3. Không train/tune thêm hoặc chạy lại locked Test ở bước serving benchmark.
 
 Sau final test, hướng cải thiện có giá trị nhất là:
 
@@ -450,7 +451,8 @@ Sau final test, hướng cải thiện có giá trị nhất là:
    author + popularity/freshness/content sources.
 4. Chỉ train V5 ranker sau khi positive natural coverage trong retrieved
    candidate set đủ tốt.
-5. Chuyển exact matrix search sang FAISS/ANN, rồi đo request-level latency.
+5. Sau Notebook 35, đóng gói ANN config đã pass thành retrieval service và đo
+   request-level latency/concurrency.
 6. Materialize incremental long-term state và nối reducer với Kafka/feature
    store/serving API.
 
@@ -465,7 +467,9 @@ Nếu muốn hiểu dự án mà không chạy lại toàn bộ:
 5. `11_colab_adaptive_gold_builder.ipynb`: recent sequence data.
 6. `docs/adaptive_evaluation.md`: lịch sử quyết định V4/V5/V6 và corrected data.
 7. `28` -> `31`: sequence correction, retraining và author calibration.
-8. `32` -> `33`: independent test rebuild và final locked-test evaluation.
+8. `32` -> `34`: independent Test, final evaluation và validation-only
+   warm-retention rejection.
+9. `35`: ANN serving parity, latency và memory benchmark.
 
 Tài liệu chi tiết liên quan:
 

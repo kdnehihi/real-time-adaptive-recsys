@@ -40,6 +40,7 @@ The earlier V1 and V2 training notebooks were removed after V3 became the select
 17. `32_colab_rebuild_adaptive_test_protocol.ipynb` - rebuild the incomplete adaptive test split from complete Two-Tower Gold, lock an exact-target test protocol, and publish the large test artifacts directly to private Hugging Face storage.
 18. `33_colab_corrected_v4_locked_test_evaluation.ipynb` - reconstruct corrected strict-prior sequences for the locked test queries and make the final no-retuning promotion decision against Legacy V4.2.
 19. `34_colab_corrected_v4_3_warm_retention.ipynb` - calibrate a validation-only static/long-term retention branch over Corrected V4.2 to recover warm-item quality without sacrificing corrected cold-item gains.
+20. `35_colab_corrected_v4_ann_serving_benchmark.ipynb` - benchmark FAISS HNSW against exact Corrected V4.2 full-policy search, including Top-1000 parity, target quality, latency, index size, and complete-output gates.
 
 The pointwise V5, standalone V6, and checkpoint-only combined notebooks were removed because notebooks 18 and 19 replace those workflows.
 
@@ -66,3 +67,5 @@ The pointwise V5, standalone V6, and checkpoint-only combined notebooks were rem
 - Notebook 32 passed all quality gates for 1,768,293 unique test examples and produced 11,737 locked queries from 983 users with zero timestamp violations.
 - Notebook 33 confirms that Corrected V4.2 significantly beats its matched corrected-input base and improves cold-item HR@1000 over Legacy V4.2, but its overall paired interval versus Legacy V4.2 crosses zero because warm-item retrieval regresses. It is not promoted yet.
 - Notebook 34 is the active validation-only recovery experiment. It adds a calibrated static/long-term retention score, keeps the locked Test untouched, and requires overall and warm paired gains plus cold non-regression before another final test is justified.
+- Notebook 34 selected the zero-weight fallback: static retention did not recover warm retrieval and is rejected without another Test run.
+- Notebook 35 is the active serving-readiness step. It freezes Corrected V4.2, uses exact full-policy search as the oracle, and evaluates whether an over-generated HNSW shortlist preserves Top-1000 retrieval after identical author/popularity reranking and point-in-time filtering.
