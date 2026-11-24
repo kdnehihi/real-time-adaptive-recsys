@@ -102,8 +102,8 @@ class RecommendPayload(BaseModel):
 
 def create_app(
     runtime: AdaptiveServingRuntime,
-    max_batch_size: int = 32,
-    batch_wait_ms: float = 5.0,
+    max_batch_size: int = 8,
+    batch_wait_ms: float = 2.0,
 ) -> FastAPI:
     """Create a thin API over one preloaded, immutable serving runtime."""
     batcher = DynamicBatcher(runtime, max_batch_size=max_batch_size, wait_ms=batch_wait_ms)

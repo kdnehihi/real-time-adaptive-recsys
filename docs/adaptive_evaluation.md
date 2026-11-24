@@ -602,3 +602,15 @@ Notebook 38 now uses a v2 runtime with a 5 ms / 32-request dynamic batcher and
 adds a 32-client concurrent HTTP benchmark. The batcher has one GPU worker,
 preserves strict-prior validation per request, and returns each request's own
 Top-K slice.
+
+The 32-client run reached 81.9 HTTP requests/second, but queueing raised p50 to
+299.9 ms and p95 to 395.7 ms. This is not a model-compute failure: direct batch
+8 still achieved 85.9 requests/second at 95.8 ms batch p95. The initial service
+therefore uses a smaller 8-request batch and 2 ms collection window. One
+Uvicorn process owns one GPU copy; higher traffic scales through replicas rather
+than extra workers on the same GPU.
+
+The deployable entrypoint is `scripts/serve_adaptive_api.py`, with the container
+definition and cache/token instructions under `deploy/`. It downloads only the
+three immutable Hugging Face serving artifacts and exposes `/health` and
+`/recommend` without Drive or Gold dependencies.

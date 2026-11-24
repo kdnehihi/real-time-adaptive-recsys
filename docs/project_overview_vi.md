@@ -439,13 +439,15 @@ artifact. Colab dùng `HF_TOKEN` để đọc và `HF_WRITE_TOKEN` để upload.
   thuộc Gold data.
 - End-to-end L4 serving pass: batch-1 p95 75,4 ms, batch-32 throughput 168,5
   request/s và peak allocation khoảng 4,47 GB.
+- Concurrent HTTP đạt 81,9 request/s nhưng p95 khoảng 395,7 ms ở 32 clients;
+  deployment ban đầu dùng batch 8, wait 2 ms và scale theo GPU replicas.
 
 Việc ngay trước mắt:
 
-1. Chạy lại Notebook 38 v2 trên L4 để benchmark dynamic batching với 32 HTTP
-   clients đồng thời.
-2. Dùng concurrent p95/throughput để chốt batch wait và deployment shape.
-3. Không train/tune thêm hoặc chạy lại locked Test ở bước serving.
+1. Build/run container trong `deploy/` với một process trên mỗi GPU.
+2. Gắn cache volume để checkpoint không bị tải lại mỗi lần restart.
+3. Thêm metrics, autoscaling và external online-state store trước production.
+4. Không train/tune thêm hoặc chạy lại locked Test ở bước serving.
 
 Sau final test, hướng cải thiện có giá trị nhất là:
 

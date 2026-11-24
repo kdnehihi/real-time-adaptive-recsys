@@ -1,0 +1,6 @@
+numpy==1.26.4
+pandas==2.2.2
+torch==2.3.1
+fastapi==0.115.0
+uvicorn==0.30.6
+huggingface-hub==0.32.4

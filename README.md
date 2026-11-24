@@ -28,6 +28,13 @@ The current scope is data understanding and batch preprocessing. Kafka, streamin
 See `docs/storage_layer.md` for more detail.
 See `docs/project_overview_vi.md` for a Vietnamese end-to-end explanation of the project, data, models, splits, evaluation, and current status.
 See `docs/gold_data_design.md` for the current ALS baseline and Two-Tower Gold dataset contracts.
+
+## Serve the Adaptive Recommender
+
+The selected prototype uses Corrected V4.2 with exact GPU retrieval and dynamic
+micro-batching. Build and run the container using [deploy/README.md](deploy/README.md).
+The service downloads immutable private Hugging Face artifacts at startup and
+does not require Google Drive or Gold data at request time.
 See `docs/two_tower_feature_encoding.md` for the current PyTorch feature encoder design.
 See `docs/two_tower_training.md` for the first Two-Tower MLP training pipeline.
 

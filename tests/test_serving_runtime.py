@@ -57,8 +57,8 @@ def test_fastapi_health_and_recommendation_contract() -> None:
         assert client.get("/health").json() == {
             "status": "ok",
             "candidate_items": 2,
-            "max_batch_size": 32,
-            "batch_wait_ms": 5.0,
+            "max_batch_size": 8,
+            "batch_wait_ms": 2.0,
         }
         response = client.post(
             "/recommend",
